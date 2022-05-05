@@ -48,6 +48,25 @@ resource "aws_cloudwatch_log_subscription_filter" "firehose_delivery_stream" {
   destination_arn = var.kinesis_firehose.firehose_delivery_stream.arn
 }
 
+resource "aws_cloudformation_stack" "firehose_autosubscribe" {
+  count = var.kinesis_firehose != null ? length(var.log_group_prefixes) : 0
+  name  = "${var.stack_name_prefix}${count.index}"
+
+  // TODO: If parameters are changed, the stack should be re-created. The lambda defined in
+  // the template only runs when the stack is created or destroyed.
+  parameters = {
+    AllowedLogGroupPrefix = var.log_group_prefixes[count.index]
+    // Set CollectionStackName to "" since we are overriding both DestinationARN and LogRolesARN
+    CollectionStackName = ""
+    DeliveryStreamARN   = var.kinesis_firehose.firehose_delivery_stream.arn
+    LogsRoleARN         = local.iam_role_arn
+  }
+  capabilities = ["CAPABILITY_IAM"]
+
+  template_body = file("${path.module}/subscribelogs.yaml")
+}
+
+
 resource "aws_lambda_permission" "permission" {
   count = var.lambda != null && !var.allow_all_log_groups ? length(var.log_group_names) : 0
 
@@ -78,4 +97,3 @@ resource "aws_cloudwatch_log_subscription_filter" "lambda" {
 
   depends_on = [aws_lambda_permission.permission, aws_lambda_permission.permission_allow_all]
 }
-

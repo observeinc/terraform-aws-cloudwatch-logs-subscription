@@ -16,9 +16,16 @@ variable "lambda" {
   default = null
 }
 
-variable "log_group_names" {
-  description = "Cloudwatch Log Group names to subscribe to Observe Lambda"
+variable "log_group_prefixes" {
+  description = "All Cloudwatch Log Group matching the listed prefixes will be subscribed"
   type        = list(string)
+  default     = []
+}
+
+variable "log_group_names" {
+  description = "Cloudwatch Log Group names to subscribe to"
+  type        = list(string)
+  default     = []
 }
 
 variable "filter_pattern" {
@@ -59,4 +66,10 @@ variable "statement_id_prefix" {
   description = "Prefix used for Lambda permission statement ID"
   type        = string
   default     = "observe-lambda"
+}
+
+variable "stack_name_prefix" {
+  description = "Prefix used for Cloudformation Stack Name"
+  type        = string
+  default     = "observe-autosubscribe"
 }
