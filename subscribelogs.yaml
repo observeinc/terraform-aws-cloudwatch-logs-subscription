@@ -7,6 +7,14 @@ Parameters:
   CollectionStackName:
     Type: "String"
     Description: "The name of the CloudFormation stack applied from the collection template in https://docs.observeinc.com/en/latest/content/data-ingestion/integrations/aws.html"
+  DeliveryStreamARN:
+    Type: "String"
+    Description: "Override ARN for the Kinesis Firehose Delivery Stream"
+    Default: ""
+  LogsRoleARN:
+    Type: "String"
+    Description: "Override ARN for the Cloudwatch Logs Role"
+    Default: ""
   LogGroupExpirationInDays:
     Type: Number
     Default: 365
@@ -26,6 +34,9 @@ Parameters:
     Description: >-
       The amount of time that Lambda allows a function to run before stopping
       it. The maximum allowed value is 900 seconds.
+Conditions:
+  OverrideDeliveryStreamARN: !Not [!Equals [!Ref DeliveryStreamARN, ""]]
+  OverrideLogsRoleARN: !Not [!Equals [!Ref LogsRoleARN, ""]]
 Resources:
   PermissionForEventsToInvokeLambda:
     Type: AWS::Lambda::Permission
@@ -91,7 +102,10 @@ Resources:
                 Action:
                   - "iam:PassRole"
                 Resource:
-                  Fn::ImportValue: !Sub "${CollectionStackName}:logs:role:arn"
+                  Fn::If:
+                    - OverrideLogsRoleARN
+                    - !Ref LogsRoleARN
+                    - Fn::ImportValue: !Sub "${CollectionStackName}:logs:role:arn"
   LogGroupSubscriberLambda:
     Type: "AWS::Lambda::Function"
     DependsOn:
@@ -104,9 +118,15 @@ Resources:
         Variables:
           ALLOWED_LOG_GROUP_PREFIX: !Ref AllowedLogGroupPrefix
           DESTINATION_ARN:
-            Fn::ImportValue: !Sub "${CollectionStackName}:firehose:arn"
+            Fn::If:
+              - OverrideDeliveryStreamARN
+              - !Ref DeliveryStreamARN
+              - Fn::ImportValue: !Sub "${CollectionStackName}:firehose:arn"
           DELIVERY_STREAM_ROLE_ARN:
-            Fn::ImportValue: !Sub "${CollectionStackName}:logs:role:arn"
+            Fn::If:
+              - OverrideLogsRoleARN
+              - !Ref LogsRoleARN
+              - Fn::ImportValue: !Sub "${CollectionStackName}:logs:role:arn"
           STACK_NAME: !Ref AWS::StackName
       Runtime: python3.9
       Timeout: !Ref LambdaTimeout
