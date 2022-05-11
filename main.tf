@@ -112,6 +112,16 @@ resource "aws_iam_policy" "subscribe_logs" {
             "Sid": "",
             "Effect": "Allow",
             "Action": [
+              "logs:DescribeLogGroups"
+            ],
+            "Resource": [
+              "arn:${local.partition}:logs:${local.region}:${local.account}:log-group:*"
+            ]
+        },
+        {
+            "Sid": "",
+            "Effect": "Allow",
+            "Action": [
               "logs:PutSubscriptionFilter",
               "logs:DescribeSubscriptionFilters",
               "logs:DeleteSubscriptionFilter"
@@ -216,11 +226,18 @@ resource "aws_s3_bucket_notification" "lambda_trigger" {
   depends_on = [aws_lambda_permission.permission_for_s3_to_invoke_lambda]
 }
 
-// When this is created or destroyed, the lambda should get triggered
+// Ensure that we wait 10s after deleting the object
+// to destroy the bucket notification and lambda. That should be enough
+// time for the s3 notification from the lambda object being deleted
+// to trigger a lambda invokation.
+resource "time_sleep" "delay_notification_destroy" {
+  depends_on       = [aws_s3_bucket_notification.lambda_trigger, aws_lambda_function.log_group_subscriber_lambda]
+  destroy_duration = "10s"
+}
+
 resource "aws_s3_bucket_object" "lambda_trigger_object" {
   bucket     = aws_s3_bucket.lambda_trigger_bucket.bucket
   key        = "lambda-trigger"
   content    = ""
-  // TODO(luke): can a race condition prevent the notification from making it to the lambda?
-  depends_on = [aws_s3_bucket_notification.lambda_trigger, aws_lambda_function.log_group_subscriber_lambda]
+  depends_on = [time_sleep.delay_notification_destroy]
 }
