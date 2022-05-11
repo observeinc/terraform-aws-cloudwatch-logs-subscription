@@ -1,19 +1,14 @@
+variable "name" {
+  type    = string
+  default = "observe-logs-subscribe"
+}
+
 variable "kinesis_firehose" {
   description = "Observe Kinesis Firehose module"
   type = object({
     firehose_delivery_stream = object({ arn = string })
     firehose_iam_policy      = object({ arn = string })
   })
-  default = null
-}
-
-variable "lambda" {
-  description = "Observe Lambda function"
-  type = object({
-    arn           = string
-    function_name = string
-  })
-  default = null
 }
 
 variable "log_group_prefixes" {
@@ -43,7 +38,7 @@ variable "filter_name" {
 variable "iam_name_prefix" {
   description = "Prefix used for all created IAM roles and policies"
   type        = string
-  default     = "observe-kinesis-firehose-"
+  default     = "observe-logs-subscribe"
 }
 
 variable "iam_role_arn" {
@@ -52,24 +47,30 @@ variable "iam_role_arn" {
   default     = ""
 }
 
-variable "allow_all_log_groups" {
-  description = <<-EOF
-    Create a single permission allowing lambda to be triggered by any log group.
-    This works around policy limits when subscribing many log groups to a single lambda."
+variable "allowed_log_group_prefix" {
+  description = "This Lambda created by this template will only look at Log Groups that match this prefix, defaults to all Log Groups"
+  type        = string
+  default     = ""
+}
+
+variable "log_group_expiration_in_days" {
+  description = <<EOF
+    Expiration to set on the log group for the lambda created by this stack
   EOF
-  type        = bool
-  default     = false
+  type        = number
+  default     = 365
+
+  validation {
+    condition     = contains([1, 3, 7, 14, 30, 90, 365], var.log_group_expiration_in_days)
+    error_message = "Expiration not in [1, 3, 7, 14, 30, 90, 365]."
+  }
 }
 
-
-variable "statement_id_prefix" {
-  description = "Prefix used for Lambda permission statement ID"
-  type        = string
-  default     = "observe-lambda"
-}
-
-variable "stack_name_prefix" {
-  description = "Prefix used for Cloudformation Stack Name"
-  type        = string
-  default     = "observe-autosubscribe"
+variable "lambda_timeout" {
+  description = <<EOF
+    The amount of time that Lambda allows a function to run before stopping
+    it. The maximum allowed value is 900 seconds.
+  EOF
+  type        = number
+  default     = 120
 }
