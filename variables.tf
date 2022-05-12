@@ -1,6 +1,6 @@
 variable "name" {
   type    = string
-  default = "observe-logs-subscribe"
+  default = "observe-logs-subscription"
 }
 
 variable "kinesis_firehose" {
@@ -12,49 +12,53 @@ variable "kinesis_firehose" {
 }
 
 variable "log_group_prefixes" {
-  description = "All Cloudwatch Log Group matching the listed prefixes will be subscribed"
+  description = <<-EOF
+    All Cloudwatch Log Groups matching the prefixes in the list will be subscribed to.
+  EOF
   type        = list(string)
   default     = []
 }
 
 variable "log_group_names" {
-  description = "Cloudwatch Log Group names to subscribe to"
+  description = <<-EOF
+    A list of Cloudwatch Log Groups to subscribe to. Unlike "log_group_prefixes",
+    each element of the array corresponds to exactly one subscription filter.
+  EOF
   type        = list(string)
   default     = []
 }
 
 variable "filter_pattern" {
-  description = "The filter pattern to use. For more information, see [Filter and Pattern Syntax](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html)"
+  description = <<-EOF
+    The filter pattern to use. For more information, see [Filter and Pattern Syntax](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html)"
+  EOF
   type        = string
   default     = ""
 }
 
 variable "filter_name" {
-  description = "Filter name"
+  description = "Name of all created Log Group Subscription Filters"
   type        = string
-  default     = "observe-filter"
+  default     = "observe-logs-subscription"
 }
 
 variable "iam_name_prefix" {
   description = "Prefix used for all created IAM roles and policies"
   type        = string
-  default     = "observe-logs-subscribe"
+  default     = "observe-logs-subscription"
 }
 
 variable "iam_role_arn" {
-  description = "ARN of IAM role to use for Cloudwatch Logs subscription"
-  type        = string
-  default     = ""
-}
-
-variable "allowed_log_group_prefix" {
-  description = "This Lambda created by this template will only look at Log Groups that match this prefix, defaults to all Log Groups"
+  description = <<-EOF
+    ARN of IAM role to use for Cloudwatch Logs subscription.
+    If this is not specified, then an IAM role is created.
+  EOF
   type        = string
   default     = ""
 }
 
 variable "log_group_expiration_in_days" {
-  description = <<EOF
+  description = <<-EOF
     Expiration to set on the log group for the lambda created by this stack
   EOF
   type        = number
