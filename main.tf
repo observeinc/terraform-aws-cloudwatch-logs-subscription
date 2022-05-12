@@ -231,7 +231,7 @@ resource "aws_s3_bucket_notification" "lambda_trigger" {
   bucket = aws_s3_bucket.lambda_trigger_bucket.bucket
 
   lambda_function {
-    events              = ["s3:ObjectCreated:*", "s3:ObjectRemoved:*"]
+    events              = ["s3:ObjectCreated:Put", "s3:ObjectRemoved:Delete"]
     lambda_function_arn = aws_lambda_function.update_log_group_subscriptions.arn
   }
 
@@ -239,8 +239,8 @@ resource "aws_s3_bucket_notification" "lambda_trigger" {
 }
 
 // Ensure that we wait 10s after creating or deleting the s3 object
-// to update the bucket notification and lambda. This ensures that deletes and
-// creates are not dropped and handled by the correct lambda version.
+// to update the bucket notification and lambda. This ensures that subscriptions
+// are properly deleted and creates are handled by the correct lambda version
 resource "time_sleep" "delay_lambda_destroy" {
   depends_on = [
     aws_s3_bucket_notification.lambda_trigger,

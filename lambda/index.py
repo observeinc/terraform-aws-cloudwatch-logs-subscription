@@ -8,6 +8,7 @@ import boto3
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+
 @dataclasses.dataclass
 class SubscriptionArgs:
     destinationArn: str
@@ -15,44 +16,53 @@ class SubscriptionArgs:
     filterPattern: str
     roleArn: str
 
+
 def modify_subscription(client, is_create: bool, logGroupName: str, subscriptionArgs: SubscriptionArgs):
-    logger.info('modify_subscription: %s %s %s', is_create, logGroupName, subscriptionArgs)
-    
-    foundFilters = client.describe_subscription_filters(logGroupName=logGroupName)
+    logger.info('modify_subscription: %s %s %s',
+                is_create, logGroupName, subscriptionArgs)
+
+    foundFilters = client.describe_subscription_filters(
+        logGroupName=logGroupName)
     logger.info('log group %s has filters %s', logGroupName, foundFilters)
-    
+
     filterExists = False
     for f in foundFilters['subscriptionFilters']:
         if is_create and f['destinationArn'] == subscriptionArgs.destinationArn:
             return True  # A subscription to this destination ARN already exists
         if f['filterName'] == subscriptionArgs.filterName:
-          filterExists = True
-    
+            filterExists = True
+
     if is_create and (not filterExists):
-            try:
-                client.put_subscription_filter(logGroupName=logGroupName,
-                                                destinationArn=subscriptionArgs.destinationArn,
-                                                filterName=subscriptionArgs.filterName,
-                                                filterPattern=subscriptionArgs.filterPattern,
-                                                roleArn=subscriptionArgs.roleArn)
-                logger.info('created subscription filter %s for log group %s', subscriptionArgs.filterName, logGroupName)
-            except Exception as err:
-                logger.error('error adding subscription to log group %s: %s', logGroupName, err)
-                return False
-    
+        try:
+            client.put_subscription_filter(logGroupName=logGroupName,
+                                           destinationArn=subscriptionArgs.destinationArn,
+                                           filterName=subscriptionArgs.filterName,
+                                           filterPattern=subscriptionArgs.filterPattern,
+                                           roleArn=subscriptionArgs.roleArn)
+            logger.info('created subscription filter %s for log group %s',
+                        subscriptionArgs.filterName, logGroupName)
+        except Exception as err:
+            logger.error(
+                'error adding subscription to log group %s: %s', logGroupName, err)
+            return False
+
     if (not is_create) and filterExists:
         try:
             client.delete_subscription_filter(logGroupName=logGroupName,
                                               filterName=subscriptionArgs.filterName)
-            logger.info('deleted subscription filter %s for log group %s', subscriptionArgs.filterName, logGroupName)
+            logger.info('deleted subscription filter %s for log group %s',
+                        subscriptionArgs.filterName, logGroupName)
         except Exception as err:
-            logger.error('error removing subscription from log group %s: %s', logGroupName, err)
+            logger.error(
+                'error removing subscription from log group %s: %s', logGroupName, err)
             return False
     return True
 
+
 def modify_subscriptions(client, is_create: str, prefixes: list, subscriptionArgs: SubscriptionArgs):
-    logger.info('modify_subscriptions: %s %s %s', is_create, prefixes, subscriptionArgs)
-    
+    logger.info('modify_subscriptions: %s %s %s',
+                is_create, prefixes, subscriptionArgs)
+
     successes, total = 0, 0
     for prefix in prefixes:
         paginator = client.get_paginator('describe_log_groups')
@@ -60,21 +70,25 @@ def modify_subscriptions(client, is_create: str, prefixes: list, subscriptionArg
 
         for page in paginator.paginate(**params):
             for lg in page['logGroups']:
-                success = modify_subscription(client, is_create, lg['logGroupName'], subscriptionArgs)
+                success = modify_subscription(
+                    client, is_create, lg['logGroupName'], subscriptionArgs)
                 successes, total = successes+(1 if success else 0), total+1
-        
-    logger.info('succeeeded updating (%d/%d) log groups matching prefixes %s', successes, total, prefixes)
+
+    logger.info('succeeeded updating (%d/%d) log groups matching prefixes %s',
+                successes, total, prefixes)
     return successes > 0 or total == 0
 
-def main(event, context):    
+
+def main(event, context):
     prefixes = json.loads(os.environ['LOG_GROUP_PREFIXES'])
     filterName = os.environ['FILTER_NAME']
     filterPattern = os.environ['FILTER_PATTERN']
     destinationArn = os.environ['DESTINATION_ARN']
     deliveryRole = os.environ['DELIVERY_STREAM_ROLE_ARN']
 
-    args = SubscriptionArgs(destinationArn, filterName, filterPattern, deliveryRole)
-    
+    args = SubscriptionArgs(destinationArn, filterName,
+                            filterPattern, deliveryRole)
+
     logger.info('received event: %s', event)
 
     client = boto3.client('logs')
