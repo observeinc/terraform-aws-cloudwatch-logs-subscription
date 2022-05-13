@@ -5,6 +5,8 @@ import os
 
 import boto3
 
+import cfnresponse
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -93,24 +95,34 @@ def main(event, context):
 
     client = boto3.client('logs')
 
-    isS3Event = 'Records' in event
+    isCfnEvent = 'ResponseURL' in event
     isEventBridgeEvent = 'detail' in event
-    if isS3Event:
-        logger.info('assuming event is an S3 notification event')
-        if len(event['Records']) != 1:
-            logger.error('s3 events with multiple records are not expected')
-            return
+    if isCfnEvent:
+        try:
+            logger.info(
+                'assuming event is a CloudFormation create or delete event')
+            anySuccesses = False
+            if event['RequestType'] == 'Create':
+                anySuccesses = modify_subscriptions(
+                    client, True, prefixes, args)
+            elif event['RequestType'] == 'Delete':
+                anySuccesses = modify_subscriptions(
+                    client, False, prefixes, args)
 
-        if event['Records'][0]['eventName'] == 'ObjectCreated:Put':
-            _ = modify_subscriptions(client, True, prefixes, args)
-        elif event['Records'][0]['eventName'] == 'ObjectRemoved:Delete':
-            _ = modify_subscriptions(client, False, prefixes, args)
+            if anySuccesses:
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+            else:
+                cfnresponse.send(event, context, cfnresponse.FAILED, {
+                                 'Data': 'Error: unable to create subscriptions for any log groups'})
+        except Exception as e:
+            logger.error('unexpected exception: %s', e)
+            cfnresponse.send(event, context, cfnresponse.FAILED, {
+                'Data': str(e)})
     elif isEventBridgeEvent:
         logger.info('assuming event is an EventBridge event')
         logGroupName = event['detail']['requestParameters']['logGroupName']
         for prefix in prefixes:
             if logGroupName.startswith(prefix):
                 _ = modify_subscription(client, True, logGroupName, args)
-                break
     else:
-        logger.error('unknown event type')
+        logger.error('failed to determine event type')

@@ -67,9 +67,6 @@ resource "aws_lambda_permission" "invoke_lambda" {
   for_each = {
     "events.amazonaws.com" = {
       source_arn = aws_cloudwatch_event_rule.new_log_group.arn
-    },
-    "s3.amazonaws.com" = {
-      source_arn = aws_s3_bucket.lambda_trigger_bucket.arn
     }
   }
 
@@ -223,42 +220,27 @@ resource "aws_cloudwatch_log_group" "lambda_log_group" {
   retention_in_days = var.log_group_expiration_in_days
 }
 
-resource "aws_s3_bucket" "lambda_trigger_bucket" {
-  bucket_prefix = var.name
-}
+resource "aws_cloudformation_stack" "lambda_trigger" {
+  name = "${var.name}-${sha256(jsonencode(local.env_vars))}"
 
-resource "aws_s3_bucket_notification" "lambda_trigger" {
-  bucket = aws_s3_bucket.lambda_trigger_bucket.bucket
-
-  lambda_function {
-    events              = ["s3:ObjectCreated:Put", "s3:ObjectRemoved:Delete"]
-    lambda_function_arn = aws_lambda_function.update_log_group_subscriptions.arn
+  parameters = {
+    "LambdaArn" = aws_lambda_function.update_log_group_subscriptions.arn
   }
 
-  depends_on = [aws_lambda_permission.invoke_lambda]
-}
+  template_body = <<-EOF
+    AWSTemplateFormatVersion: 2010-09-09
+    Parameters:
+      LambdaArn:
+        Type: "String"
+        Default: ""
+        Description: "The ARN of the Lambda to trigger"
+    Resources:
+      InitialLambdaTrigger:
+        Type: Custom::InitialLambdaTrigger
+        Properties:
+          Description: On stack creation, add subscriptions to all existing log groups that match the specified filters. On deletion, remove all subscriptions added by this template.
+          ServiceToken: !Ref LambdaArn
+  EOF
 
-// Ensure that we wait 10s after creating or deleting the s3 object
-// to update the bucket notification and lambda. This ensures that subscriptions
-// are properly deleted and creates are handled by the correct lambda version
-resource "time_sleep" "delay_lambda_destroy" {
-  depends_on = [
-    aws_s3_bucket_notification.lambda_trigger,
-    aws_lambda_function.update_log_group_subscriptions,
-    aws_iam_policy.subscribe_logs,
-  ]
-  create_duration  = "10s"
-  destroy_duration = "10s"
-
-  # delay_lambda_destroy.triggers and lambda_trigger_object.key should reference the same variable
-  triggers = local.env_vars
-}
-
-resource "aws_s3_bucket_object" "lambda_trigger_object" {
-  bucket = aws_s3_bucket.lambda_trigger_bucket.bucket
-
-  # Always re-create the subscriptions when the env variables change
-  # delay_lambda_destroy.triggers and lambda_trigger_object.key should reference the same variable
-  key        = sha256(jsonencode(local.env_vars))
-  depends_on = [time_sleep.delay_lambda_destroy]
+  depends_on = [aws_iam_policy.subscribe_logs]
 }
