@@ -4,6 +4,5 @@ terraform {
   required_providers {
     archive = ">= 2.2"
     aws     = ">= 2.68"
-    time    = ">= 0.7"
   }
 }
