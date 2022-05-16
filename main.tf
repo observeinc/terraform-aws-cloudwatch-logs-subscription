@@ -15,8 +15,8 @@ locals {
     "FILTER_NAME"              = var.filter_name
     "FILTER_PATTERN"           = var.filter_pattern
 
-    // Bump VERSION if we want to re-create the subscription filters even
-    // if the user's environment variables haven't changed.
+    # Bump VERSION if we want to re-create the subscription filters even
+    # if the user's environment variables haven't changed.
     "VERSION" = 0
   }
 }

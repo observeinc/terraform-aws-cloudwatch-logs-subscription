@@ -1,6 +1,7 @@
 variable "name" {
-  type    = string
-  default = "observe-logs-subscription"
+  type        = string
+  default     = "observe-logs-subscription"
+  description = "Module name. Used to determine the name of some resources"
 }
 
 variable "kinesis_firehose" {
