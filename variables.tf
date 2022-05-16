@@ -1,0 +1,80 @@
+variable "name" {
+  type    = string
+  default = "observe-logs-subscription"
+}
+
+variable "kinesis_firehose" {
+  description = "Observe Kinesis Firehose module"
+  type = object({
+    firehose_delivery_stream = object({ arn = string })
+    firehose_iam_policy      = object({ arn = string })
+  })
+}
+
+variable "log_group_prefixes" {
+  description = <<-EOF
+    All Cloudwatch Log Groups matching the prefixes in the list will be subscribed to.
+  EOF
+  type        = list(string)
+  default     = []
+}
+
+variable "log_group_names" {
+  description = <<-EOF
+    A list of Cloudwatch Log Groups to subscribe to. Unlike "log_group_prefixes",
+    each element of the array corresponds to exactly one subscription filter.
+  EOF
+  type        = list(string)
+  default     = []
+}
+
+variable "filter_pattern" {
+  description = <<-EOF
+    The filter pattern to use. For more information, see [Filter and Pattern Syntax](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html)"
+  EOF
+  type        = string
+  default     = ""
+}
+
+variable "filter_name" {
+  description = "Name of all created Log Group Subscription Filters"
+  type        = string
+  default     = "observe-logs-subscription"
+}
+
+variable "iam_name_prefix" {
+  description = "Prefix used for all created IAM roles and policies"
+  type        = string
+  default     = "observe-logs-subscription"
+}
+
+variable "iam_role_arn" {
+  description = <<-EOF
+    ARN of IAM role to use for Cloudwatch Logs subscription.
+    If this is not specified, then an IAM role is created.
+  EOF
+  type        = string
+  default     = ""
+}
+
+variable "log_group_expiration_in_days" {
+  description = <<-EOF
+    Expiration to set on the log group for the lambda created by this stack
+  EOF
+  type        = number
+  default     = 365
+
+  validation {
+    condition     = contains([1, 3, 7, 14, 30, 90, 365], var.log_group_expiration_in_days)
+    error_message = "Expiration not in [1, 3, 7, 14, 30, 90, 365]."
+  }
+}
+
+variable "lambda_timeout" {
+  description = <<EOF
+    The amount of time that Lambda allows a function to run before stopping
+    it. The maximum allowed value is 900 seconds.
+  EOF
+  type        = number
+  default     = 120
+}
