@@ -11,7 +11,9 @@ locals {
   ]
 
   env_vars = {
-    "LOG_GROUP_PREFIXES"       = jsonencode(var.log_group_prefixes)
+    "LOG_GROUP_PREFIXES" = jsonencode(var.log_group_prefixes)
+    // LOG_GROUPS_TO_IGNORE makes the Lambda Function ignore all log groups that are managed by
+    // an aws_cloudwatch_log_subscription_filter terraform resource.
     "LOG_GROUPS_TO_IGNORE"     = jsonencode(var.log_group_names)
     "DESTINATION_ARN"          = var.kinesis_firehose.firehose_delivery_stream.arn
     "DELIVERY_STREAM_ROLE_ARN" = local.subscription_filter_role_arn

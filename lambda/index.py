@@ -13,59 +13,59 @@ logger.setLevel(logging.INFO)
 
 @dataclasses.dataclass
 class SubscriptionArgs:
-    destinationArn: str
-    filterName: str
-    filterPattern: str
-    roleArn: str
+    destination_arn: str
+    filter_name: str
+    filter_pattern: str
+    role_arn: str
 
 
-def modify_subscription(client, is_create: bool, logGroupName: str, subscriptionArgs: SubscriptionArgs):
+def modify_subscription(client, is_create: bool, log_group_name: str, subscription_args: SubscriptionArgs):
     logger.info('modify_subscription: %s %s %s',
-                is_create, logGroupName, subscriptionArgs)
+                is_create, log_group_name, subscription_args)
 
-    foundFilters = client.describe_subscription_filters(
-        logGroupName=logGroupName)
-    logger.info('log group %s has filters %s', logGroupName, foundFilters)
+    found_filters = client.describe_subscription_filters(
+        logGroupName=log_group_name)
+    logger.info('log group %s has filters %s', log_group_name, found_filters)
 
-    filterExists = False
-    for f in foundFilters['subscriptionFilters']:
-        if is_create and f['destinationArn'] == subscriptionArgs.destinationArn:
+    filter_exists = False
+    for f in found_filters['subscriptionFilters']:
+        if is_create and f['destinationArn'] == subscription_args.destination_arn:
             return True  # A subscription to this destination ARN already exists
-        if f['filterName'] == subscriptionArgs.filterName:
-            filterExists = True
+        if f['filterName'] == subscription_args.filter_name:
+            filter_exists = True
 
-    if is_create and (not filterExists):
+    if is_create and (not filter_exists):
         try:
-            client.put_subscription_filter(logGroupName=logGroupName,
-                                           destinationArn=subscriptionArgs.destinationArn,
-                                           filterName=subscriptionArgs.filterName,
-                                           filterPattern=subscriptionArgs.filterPattern,
-                                           roleArn=subscriptionArgs.roleArn)
+            client.put_subscription_filter(logGroupName=log_group_name,
+                                           destinationArn=subscription_args.destination_arn,
+                                           filterName=subscription_args.filter_name,
+                                           filterPattern=subscription_args.filter_pattern,
+                                           roleArn=subscription_args.role_arn)
             logger.info('created subscription filter %s for log group %s',
-                        subscriptionArgs.filterName, logGroupName)
+                        subscription_args.filter_name, log_group_name)
         except Exception as err:
             logger.error(
-                'error adding subscription to log group %s: %s', logGroupName, err)
+                'error adding subscription to log group %s: %s', log_group_name, err)
             return False
 
-    if (not is_create) and filterExists:
+    if (not is_create) and filter_exists:
         try:
-            client.delete_subscription_filter(logGroupName=logGroupName,
-                                              filterName=subscriptionArgs.filterName)
+            client.delete_subscription_filter(logGroupName=log_group_name,
+                                              filterName=subscription_args.filter_name)
             logger.info('deleted subscription filter %s for log group %s',
-                        subscriptionArgs.filterName, logGroupName)
+                        subscription_args.filter_name, log_group_name)
         except Exception as err:
             logger.error(
-                'error removing subscription from log group %s: %s', logGroupName, err)
+                'error removing subscription from log group %s: %s', log_group_name, err)
             return False
     return True
 
 
-def modify_subscriptions(client, is_create: str, prefixes: list, toIgnore: list, subscriptionArgs: SubscriptionArgs):
+def modify_subscriptions(client, is_create: str, prefixes: list, to_ignore: list, subscription_args: SubscriptionArgs):
     logger.info('modify_subscriptions: %s %s %s',
-                is_create, prefixes, subscriptionArgs)
+                is_create, prefixes, subscription_args)
 
-    ignoreSet = set(toIgnore)
+    ignore_set = set(to_ignore)
 
     successes, total = 0, 0
     for prefix in prefixes:
@@ -75,11 +75,11 @@ def modify_subscriptions(client, is_create: str, prefixes: list, toIgnore: list,
         for page in paginator.paginate(**params):
             for lg in page['logGroups']:
                 name = lg['logGroupName']
-                if name in ignoreSet:
+                if name in ignore_set:
                     logging.info('ignoring log group %s', name)
                     continue
                 success = modify_subscription(
-                    client, is_create, name, subscriptionArgs)
+                    client, is_create, name, subscription_args)
                 successes, total = successes+(1 if success else 0), total+1
 
     logger.info('succeeeded updating (%d/%d) log groups matching prefixes %s',
@@ -89,34 +89,34 @@ def modify_subscriptions(client, is_create: str, prefixes: list, toIgnore: list,
 
 def main(event, context):
     prefixes = json.loads(os.environ['LOG_GROUP_PREFIXES'])
-    toIgnore = json.loads(os.environ['LOG_GROUPS_TO_IGNORE'])
-    filterName = os.environ['FILTER_NAME']
-    filterPattern = os.environ['FILTER_PATTERN']
-    destinationArn = os.environ['DESTINATION_ARN']
-    deliveryRole = os.environ['DELIVERY_STREAM_ROLE_ARN']
+    to_ignore = json.loads(os.environ['LOG_GROUPS_TO_IGNORE'])
+    filter_name = os.environ['FILTER_NAME']
+    filter_pattern = os.environ['FILTER_PATTERN']
+    destination_rn = os.environ['DESTINATION_ARN']
+    delivery_role = os.environ['DELIVERY_STREAM_ROLE_ARN']
 
-    args = SubscriptionArgs(destinationArn, filterName,
-                            filterPattern, deliveryRole)
+    args = SubscriptionArgs(destination_rn, filter_name,
+                            filter_pattern, delivery_role)
 
     logger.info('received event: %s', event)
 
     client = boto3.client('logs')
 
-    isCfnEvent = 'ResponseURL' in event
-    isEventBridgeEvent = 'detail' in event
-    if isCfnEvent:
+    is_cfn_event = 'ResponseURL' in event
+    is_eventbridge_event = 'detail' in event
+    if is_cfn_event:
         try:
             logger.info(
                 'assuming event is a CloudFormation create or delete event')
-            anySuccesses = False
+            any_successes = False
             if event['RequestType'] == 'Create':
-                anySuccesses = modify_subscriptions(
-                    client, True, prefixes, toIgnore, args)
+                any_successes = modify_subscriptions(
+                    client, True, prefixes, to_ignore, args)
             elif event['RequestType'] == 'Delete':
-                anySuccesses = modify_subscriptions(
-                    client, False, prefixes, toIgnore, args)
+                any_successes = modify_subscriptions(
+                    client, False, prefixes, to_ignore, args)
 
-            if anySuccesses:
+            if any_successes:
                 cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
             else:
                 cfnresponse.send(event, context, cfnresponse.FAILED, {
@@ -125,15 +125,15 @@ def main(event, context):
             logger.error('unexpected exception: %s', e)
             cfnresponse.send(event, context, cfnresponse.FAILED, {
                 'Data': str(e)})
-    elif isEventBridgeEvent:
+    elif is_eventbridge_event:
         logger.info('assuming event is an EventBridge event')
-        logGroupName = event['detail']['requestParameters']['logGroupName']
-        if logGroupName in toIgnore:
-            logging.info('ignoring log group %s', logGroupName)
+        name = event['detail']['requestParameters']['logGroupName']
+        if name in to_ignore:
+            logging.info('ignoring log group %s', name)
         else:
-            shouldModify = any([logGroupName.startswith(prefix)
-                               for prefix in prefixes])
-            if shouldModify:
-                _ = modify_subscription(client, True, logGroupName, args)
+            should_modify = any([name.startswith(prefix)
+                                for prefix in prefixes])
+            if should_modify:
+                _ = modify_subscription(client, True, name, args)
     else:
         logger.error('failed to determine event type')
