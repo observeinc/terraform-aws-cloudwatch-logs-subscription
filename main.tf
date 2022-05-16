@@ -4,12 +4,15 @@ locals {
   region    = data.aws_region.current.name
 
   subscription_filter_role_arn = var.iam_role_arn != "" ? var.iam_role_arn : aws_iam_role.subscription_filter[0].arn
+
+  enabled_lambda_count = length(var.log_group_prefixes) > 0 ? 1 : 0
   log_group_prefix_arns = [for prefix in var.log_group_prefixes :
     "arn:${local.partition}:logs:${local.region}:${local.account}:log-group:${prefix}*"
   ]
 
   env_vars = {
     "LOG_GROUP_PREFIXES"       = jsonencode(var.log_group_prefixes)
+    "LOG_GROUPS_TO_IGNORE"     = jsonencode(var.log_group_names)
     "DESTINATION_ARN"          = var.kinesis_firehose.firehose_delivery_stream.arn
     "DELIVERY_STREAM_ROLE_ARN" = local.subscription_filter_role_arn
     "FILTER_NAME"              = var.filter_name
@@ -61,22 +64,24 @@ resource "aws_cloudwatch_log_subscription_filter" "explicit_filters" {
   filter_pattern  = var.filter_pattern
   role_arn        = local.subscription_filter_role_arn
   destination_arn = var.kinesis_firehose.firehose_delivery_stream.arn
+
+  // Explicit filters are created after and deleted before the lambda is triggered
+  // to avoid potential state errors.
+  depends_on = [aws_cloudformation_stack.lambda_trigger]
 }
 
 resource "aws_lambda_permission" "invoke_lambda" {
-  for_each = {
-    "events.amazonaws.com" = {
-      source_arn = aws_cloudwatch_event_rule.new_log_group.arn
-    }
-  }
+  count = local.enabled_lambda_count
 
-  function_name = aws_lambda_function.update_log_group_subscriptions.function_name
+  function_name = aws_lambda_function.update_log_group_subscriptions[0].function_name
   action        = "lambda:InvokeFunction"
-  principal     = each.key
-  source_arn    = each.value.source_arn
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.new_log_group[0].arn
 }
 
 resource "aws_cloudwatch_event_rule" "new_log_group" {
+  count = local.enabled_lambda_count
+
   name_prefix   = var.name
   description   = "Rule to listen for new log groups and trigger the log group subscriber lambda"
   event_pattern = <<-EOF
@@ -92,14 +97,18 @@ resource "aws_cloudwatch_event_rule" "new_log_group" {
 }
 
 resource "aws_cloudwatch_event_target" "new_log_group" {
-  target_id = aws_lambda_function.update_log_group_subscriptions.id
-  rule      = aws_cloudwatch_event_rule.new_log_group.name
-  arn       = aws_lambda_function.update_log_group_subscriptions.arn
+  count = local.enabled_lambda_count
+
+  target_id = aws_lambda_function.update_log_group_subscriptions[0].id
+  rule      = aws_cloudwatch_event_rule.new_log_group[0].name
+  arn       = aws_lambda_function.update_log_group_subscriptions[0].arn
 
   depends_on = [aws_lambda_permission.invoke_lambda]
 }
 
 resource "aws_iam_role" "lambda" {
+  count = local.enabled_lambda_count
+
   name_prefix        = var.iam_name_prefix
   description        = "Role for the log group subscriber lambda"
   assume_role_policy = <<-EOF
@@ -119,6 +128,8 @@ resource "aws_iam_role" "lambda" {
 }
 
 resource "aws_iam_policy" "subscribe_logs" {
+  count = local.enabled_lambda_count
+
   name_prefix = var.iam_name_prefix
   policy      = <<-EOF
     {
@@ -150,11 +161,15 @@ resource "aws_iam_policy" "subscribe_logs" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_subscribe_logs" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = aws_iam_policy.subscribe_logs.arn
+  count = length(aws_iam_policy.subscribe_logs) > 0 ? 1 : 0
+
+  role       = aws_iam_role.lambda[0].name
+  policy_arn = aws_iam_policy.subscribe_logs[0].arn
 }
 
 resource "aws_iam_policy" "pass_role" {
+  count = local.enabled_lambda_count
+
   name_prefix = var.iam_name_prefix
   policy      = <<-EOF
       {
@@ -176,28 +191,38 @@ resource "aws_iam_policy" "pass_role" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_pass_role" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = aws_iam_policy.pass_role.arn
+  count = local.enabled_lambda_count
+
+  role       = aws_iam_role.lambda[0].name
+  policy_arn = aws_iam_policy.pass_role[0].arn
 }
 
 data "aws_iam_policy" "lambda_basic_execution" {
+  count = local.enabled_lambda_count
+
   arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_lambda_basic_execution" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = data.aws_iam_policy.lambda_basic_execution.arn
+  count = local.enabled_lambda_count
+
+  role       = aws_iam_role.lambda[0].name
+  policy_arn = data.aws_iam_policy.lambda_basic_execution[0].arn
 }
 
 data "archive_file" "lambda_code" {
+  count = local.enabled_lambda_count
+
   type        = "zip"
   source_dir  = "${path.module}/lambda/"
   output_path = "${path.module}/files/lambda.zip"
 }
 
 resource "aws_lambda_function" "update_log_group_subscriptions" {
+  count = local.enabled_lambda_count
+
   function_name = var.name
-  role          = aws_iam_role.lambda.arn
+  role          = aws_iam_role.lambda[0].arn
 
   description = <<-EOF
     Look at all specified log groups and add/remove subscriptions filters if necessary
@@ -211,20 +236,24 @@ resource "aws_lambda_function" "update_log_group_subscriptions" {
   timeout = var.lambda_timeout
   handler = "index.main"
 
-  filename         = data.archive_file.lambda_code.output_path
-  source_code_hash = data.archive_file.lambda_code.output_base64sha256
+  filename         = data.archive_file.lambda_code[0].output_path
+  source_code_hash = data.archive_file.lambda_code[0].output_base64sha256
 }
 
 resource "aws_cloudwatch_log_group" "lambda_log_group" {
-  name              = "/aws/lambda/${aws_lambda_function.update_log_group_subscriptions.function_name}"
+  count = local.enabled_lambda_count
+
+  name              = "/aws/lambda/${aws_lambda_function.update_log_group_subscriptions[0].function_name}"
   retention_in_days = var.log_group_expiration_in_days
 }
 
 resource "aws_cloudformation_stack" "lambda_trigger" {
+  count = local.enabled_lambda_count
+
   name = "${var.name}-${sha256(jsonencode(local.env_vars))}"
 
   parameters = {
-    "LambdaArn" = aws_lambda_function.update_log_group_subscriptions.arn
+    "LambdaArn" = aws_lambda_function.update_log_group_subscriptions[0].arn
   }
 
   template_body = <<-EOF

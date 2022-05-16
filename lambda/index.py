@@ -61,9 +61,11 @@ def modify_subscription(client, is_create: bool, logGroupName: str, subscription
     return True
 
 
-def modify_subscriptions(client, is_create: str, prefixes: list, subscriptionArgs: SubscriptionArgs):
+def modify_subscriptions(client, is_create: str, prefixes: list, toIgnore: list, subscriptionArgs: SubscriptionArgs):
     logger.info('modify_subscriptions: %s %s %s',
                 is_create, prefixes, subscriptionArgs)
+
+    ignoreSet = set(toIgnore)
 
     successes, total = 0, 0
     for prefix in prefixes:
@@ -72,8 +74,12 @@ def modify_subscriptions(client, is_create: str, prefixes: list, subscriptionArg
 
         for page in paginator.paginate(**params):
             for lg in page['logGroups']:
+                name = lg['logGroupName']
+                if name in ignoreSet:
+                    logging.info('ignoring log group %s', name)
+                    continue
                 success = modify_subscription(
-                    client, is_create, lg['logGroupName'], subscriptionArgs)
+                    client, is_create, name, subscriptionArgs)
                 successes, total = successes+(1 if success else 0), total+1
 
     logger.info('succeeeded updating (%d/%d) log groups matching prefixes %s',
@@ -83,6 +89,7 @@ def modify_subscriptions(client, is_create: str, prefixes: list, subscriptionArg
 
 def main(event, context):
     prefixes = json.loads(os.environ['LOG_GROUP_PREFIXES'])
+    toIgnore = json.loads(os.environ['LOG_GROUPS_TO_IGNORE'])
     filterName = os.environ['FILTER_NAME']
     filterPattern = os.environ['FILTER_PATTERN']
     destinationArn = os.environ['DESTINATION_ARN']
@@ -104,10 +111,10 @@ def main(event, context):
             anySuccesses = False
             if event['RequestType'] == 'Create':
                 anySuccesses = modify_subscriptions(
-                    client, True, prefixes, args)
+                    client, True, prefixes, toIgnore, args)
             elif event['RequestType'] == 'Delete':
                 anySuccesses = modify_subscriptions(
-                    client, False, prefixes, args)
+                    client, False, prefixes, toIgnore, args)
 
             if anySuccesses:
                 cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
@@ -121,8 +128,12 @@ def main(event, context):
     elif isEventBridgeEvent:
         logger.info('assuming event is an EventBridge event')
         logGroupName = event['detail']['requestParameters']['logGroupName']
-        for prefix in prefixes:
-            if logGroupName.startswith(prefix):
+        if logGroupName in toIgnore:
+            logging.info('ignoring log group %s', logGroupName)
+        else:
+            shouldModify = any([logGroupName.startswith(prefix)
+                               for prefix in prefixes])
+            if shouldModify:
                 _ = modify_subscription(client, True, logGroupName, args)
     else:
         logger.error('failed to determine event type')
