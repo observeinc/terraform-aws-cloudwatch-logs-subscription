@@ -61,6 +61,24 @@ def modify_subscription(client, is_create: bool, log_group_name: str, subscripti
     return True
 
 
+def should_subscribe(name: str, matches: list, exclusions: list) -> bool:
+    """should_subscribe checks whether a log group with name 'name' should be subscribed to"""
+    exclude = any([re.search(pattern, name)
+                   for pattern in exclusions])
+    if exclude:
+        logging.info(
+            'log group %s matches an exclusion regex pattern %s', name, exclusions)
+    else:
+        match = any([re.search(pattern, name)
+                    for pattern in matches])
+        if match:
+            return True
+        else:
+            logging.info(
+                'no matches for log group %s in %s', name, matches)
+    return False
+
+
 def modify_subscriptions(client, is_create: str, matches: list, exclusions: list, subscription_args: SubscriptionArgs):
     logger.info('modify_subscriptions: %s %s %s %s',
                 is_create, matches, exclusions, subscription_args)
@@ -70,24 +88,13 @@ def modify_subscriptions(client, is_create: str, matches: list, exclusions: list
     for page in paginator.paginate():
         for lg in page['logGroups']:
             name = lg['logGroupName']
-            exclude = any([re.search(pattern, name)
-                           for pattern in exclusions])
-            if exclude:
-                logging.info(
-                    'log group %s matches an exclusion regex pattern %s', name, exclusions)
-            else:
-                match = any([re.search(pattern, name)
-                            for pattern in matches])
-                if match:
-                    success = modify_subscription(
-                        client, is_create, name, subscription_args)
-                    successes, total = successes + \
-                        (1 if success else 0), total+1
-                else:
-                    logging.info(
-                        'no matches for log group %s in %s', name, matches)
+            if should_subscribe(name, matches, exclusions):
+                success = modify_subscription(
+                    client, is_create, name, subscription_args)
+                successes, total = successes + \
+                    (1 if success else 0), total+1
 
-    logger.info('succeeeded updating (%d/%d) log groups matching prefixes %s',
+    logger.info('succeeeded updating (%d/%d) log groups matching patterns %s',
                 successes, total, matches)
     return successes > 0 or total == 0
 
@@ -135,17 +142,7 @@ def main(event, context):
     elif is_eventbridge_event:
         logger.info('assuming event is an EventBridge event')
         name = event['detail']['requestParameters']['logGroupName']
-
-        exclude = any([re.search(pattern, name) for pattern in exclusions])
-        if exclude:
-            logging.info(
-                'log group %s matches an exclusion regex pattern %s', name, exclusions)
-        else:
-            match = any([re.search(pattern, name) for pattern in matches])
-            if match:
-                _ = modify_subscription(client, True, name, args)
-            else:
-                logging.info(
-                    'no matches for log group %s in %s', name, matches)
+        if should_subscribe(name, matches, exclusions):
+            _ = modify_subscription(client, True, name, args)
     else:
         logger.error('failed to determine event type')
