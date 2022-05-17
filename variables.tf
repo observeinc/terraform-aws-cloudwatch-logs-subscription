@@ -12,21 +12,23 @@ variable "kinesis_firehose" {
   })
 }
 
-variable "log_group_prefixes" {
+variable "log_group_matches" {
   description = <<-EOF
-    All Cloudwatch Log Groups matching the prefixes in the list will be subscribed to.
+    A list of regex patterns. If a Log Group matches any regex pattern in the list,
+    it will be subscribed to.
   EOF
   type        = list(string)
   default     = []
 }
 
-variable "log_group_names" {
+variable "log_group_excludes" {
   description = <<-EOF
-    A list of Cloudwatch Log Groups to subscribe to. Unlike "log_group_prefixes",
-    each element of the array corresponds to exactly one subscription filter.
+    A list of regex patterns. If a Log Group matches any regex pattern in the list, it will
+    not be subscribed to. log_group_excludes takes precedence over log_group_matches.
   EOF
-  type        = list(string)
-  default     = []
+
+  type    = list(string)
+  default = []
 }
 
 variable "filter_pattern" {

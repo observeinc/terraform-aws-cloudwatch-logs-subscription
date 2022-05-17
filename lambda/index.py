@@ -1,7 +1,7 @@
 import dataclasses
-import json
 import logging
 import os
+import re
 
 import boto3
 
@@ -61,35 +61,40 @@ def modify_subscription(client, is_create: bool, log_group_name: str, subscripti
     return True
 
 
-def modify_subscriptions(client, is_create: str, prefixes: list, to_ignore: list, subscription_args: SubscriptionArgs):
-    logger.info('modify_subscriptions: %s %s %s',
-                is_create, prefixes, subscription_args)
-
-    ignore_set = set(to_ignore)
+def modify_subscriptions(client, is_create: str, matches: list, exclusions: list, subscription_args: SubscriptionArgs):
+    logger.info('modify_subscriptions: %s %s %s %s',
+                is_create, matches, exclusions, subscription_args)
 
     successes, total = 0, 0
-    for prefix in prefixes:
-        paginator = client.get_paginator('describe_log_groups')
-        params = {'logGroupNamePrefix': prefix} if len(prefix) > 0 else {}
-
-        for page in paginator.paginate(**params):
-            for lg in page['logGroups']:
-                name = lg['logGroupName']
-                if name in ignore_set:
-                    logging.info('ignoring log group %s', name)
-                    continue
-                success = modify_subscription(
-                    client, is_create, name, subscription_args)
-                successes, total = successes+(1 if success else 0), total+1
+    paginator = client.get_paginator('describe_log_groups')
+    for page in paginator.paginate():
+        for lg in page['logGroups']:
+            name = lg['logGroupName']
+            exclude = any([re.search(pattern, name)
+                           for pattern in exclusions])
+            if exclude:
+                logging.info(
+                    'log group %s matches an exclusion regex pattern %s', name, exclusions)
+            else:
+                match = any([re.search(pattern, name)
+                            for pattern in matches])
+                if match:
+                    success = modify_subscription(
+                        client, is_create, name, subscription_args)
+                    successes, total = successes + \
+                        (1 if success else 0), total+1
+                else:
+                    logging.info(
+                        'no matches for log group %s in %s', name, matches)
 
     logger.info('succeeeded updating (%d/%d) log groups matching prefixes %s',
-                successes, total, prefixes)
+                successes, total, matches)
     return successes > 0 or total == 0
 
 
 def main(event, context):
-    prefixes = json.loads(os.environ['LOG_GROUP_PREFIXES'])
-    to_ignore = json.loads(os.environ['LOG_GROUPS_TO_IGNORE'])
+    matches = os.environ['LOG_GROUP_MATCHES'].split(",")
+    exclusions = os.environ['LOG_GROUP_EXCLUDES'].split(",")
     filter_name = os.environ['FILTER_NAME']
     filter_pattern = os.environ['FILTER_PATTERN']
     destination_rn = os.environ['DESTINATION_ARN']
@@ -111,10 +116,10 @@ def main(event, context):
             any_successes = False
             if event['RequestType'] == 'Create':
                 any_successes = modify_subscriptions(
-                    client, True, prefixes, to_ignore, args)
+                    client, True, matches, exclusions, args)
             elif event['RequestType'] == 'Delete':
                 any_successes = modify_subscriptions(
-                    client, False, prefixes, to_ignore, args)
+                    client, False, matches, exclusions, args)
 
             if any_successes:
                 cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
@@ -128,12 +133,17 @@ def main(event, context):
     elif is_eventbridge_event:
         logger.info('assuming event is an EventBridge event')
         name = event['detail']['requestParameters']['logGroupName']
-        if name in to_ignore:
-            logging.info('ignoring log group %s', name)
+
+        exclude = any([re.search(pattern, name) for pattern in exclusions])
+        if exclude:
+            logging.info(
+                'log group %s matches an exclusion regex pattern %s', name, exclusions)
         else:
-            should_modify = any([name.startswith(prefix)
-                                for prefix in prefixes])
-            if should_modify:
+            match = any([re.search(pattern, name) for pattern in matches])
+            if match:
                 _ = modify_subscription(client, True, name, args)
+            else:
+                logging.info(
+                    'no matches for log group %s in %s', name, matches)
     else:
         logger.error('failed to determine event type')
