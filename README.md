@@ -26,16 +26,16 @@ module "observe_kinesis_firehose_cloudwatch_logs_subscription" {
   source           = "https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription"
   kinesis_firehose = module.observe_kinesis_firehose
 
-  # Collect all Elastic Beanstalk logs and API Gateway execution logs
-  log_group_prefixes  = [
+  # Collect the log group defined above, all Elastic Beanstalk logs,
+  # and API Gateway execution logs
+  log_group_matches  = [
+    "^${aws_cloudwatch_log_group.group.name}$",
     "/aws/elasticbeanstalk/",
     "API-Gateway-Execution-Logs",
   ]
-
-  # Also collect logs from log group defined above
-  log_group_names  = [
-    aws_cloudwatch_log_group.group.name
-  ]
+  
+  # Don't collect any Elastic Beanstalk Nginx access logs
+  log_group_excludes = ["^/aws/elasticbeanstalk/.*/var/log/nginx/access.log$"]
 }
 ```
 
@@ -46,18 +46,18 @@ If no role ARN is provided, a new role will be created.
 <!-- BEGINNING OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
 ## Requirements
 
-| Name | Version |
-|------|---------|
+| Name                                                                      | Version   |
+| ------------------------------------------------------------------------- | --------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 0.13.0 |
-| <a name="requirement_archive"></a> [archive](#requirement\_archive) | >= 2.2 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 2.68 |
+| <a name="requirement_archive"></a> [archive](#requirement\_archive)       | >= 2.2    |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws)                   | >= 2.68   |
 
 ## Providers
 
-| Name | Version |
-|------|---------|
-| <a name="provider_archive"></a> [archive](#provider\_archive) | >= 2.2 |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 2.68 |
+| Name                                                          | Version |
+| ------------------------------------------------------------- | ------- |
+| <a name="provider_archive"></a> [archive](#provider\_archive) | >= 2.2  |
+| <a name="provider_aws"></a> [aws](#provider\_aws)             | >= 2.68 |
 
 ## Modules
 
@@ -65,43 +65,43 @@ No modules.
 
 ## Resources
 
-| Name | Type |
-|------|------|
-| [aws_cloudformation_stack.lambda_trigger](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudformation_stack) | resource |
-| [aws_cloudwatch_event_rule.new_log_group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_rule) | resource |
-| [aws_cloudwatch_event_target.new_log_group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_target) | resource |
-| [aws_cloudwatch_log_group.lambda_log_group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group) | resource |
-| [aws_cloudwatch_log_subscription_filter.explicit_filters](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_subscription_filter) | resource |
-| [aws_iam_policy.pass_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
-| [aws_iam_policy.subscribe_logs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
-| [aws_iam_role.lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
-| [aws_iam_role.subscription_filter](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
-| [aws_iam_role_policy_attachment.lambda_lambda_basic_execution](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
-| [aws_iam_role_policy_attachment.lambda_pass_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
-| [aws_iam_role_policy_attachment.lambda_subscribe_logs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
-| [aws_iam_role_policy_attachment.subscription_filter_publish_logs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
-| [aws_lambda_function.update_log_group_subscriptions](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_function) | resource |
-| [aws_lambda_permission.invoke_lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_permission) | resource |
-| [archive_file.lambda_code](https://registry.terraform.io/providers/hashicorp/archive/latest/docs/data-sources/file) | data source |
-| [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
-| [aws_iam_policy.lambda_basic_execution](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy) | data source |
-| [aws_partition.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/partition) | data source |
-| [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
+| Name                                                                                                                                                                      | Type        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| [aws_cloudformation_stack.lambda_trigger](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudformation_stack)                               | resource    |
+| [aws_cloudwatch_event_rule.new_log_group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_rule)                              | resource    |
+| [aws_cloudwatch_event_target.new_log_group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_target)                          | resource    |
+| [aws_cloudwatch_log_group.lambda_log_group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group)                             | resource    |
+| [aws_cloudwatch_log_subscription_filter.explicit_filters](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_subscription_filter) | resource    |
+| [aws_iam_policy.pass_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy)                                                        | resource    |
+| [aws_iam_policy.subscribe_logs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy)                                                   | resource    |
+| [aws_iam_role.lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role)                                                               | resource    |
+| [aws_iam_role.subscription_filter](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role)                                                  | resource    |
+| [aws_iam_role_policy_attachment.lambda_lambda_basic_execution](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment)    | resource    |
+| [aws_iam_role_policy_attachment.lambda_pass_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment)                 | resource    |
+| [aws_iam_role_policy_attachment.lambda_subscribe_logs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment)            | resource    |
+| [aws_iam_role_policy_attachment.subscription_filter_publish_logs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource    |
+| [aws_lambda_function.update_log_group_subscriptions](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_function)                         | resource    |
+| [aws_lambda_permission.invoke_lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_permission)                                      | resource    |
+| [archive_file.lambda_code](https://registry.terraform.io/providers/hashicorp/archive/latest/docs/data-sources/file)                                                       | data source |
+| [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity)                                             | data source |
+| [aws_iam_policy.lambda_basic_execution](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy)                                        | data source |
+| [aws_partition.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/partition)                                                         | data source |
+| [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region)                                                               | data source |
 
 ## Inputs
 
-| Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| <a name="input_filter_name"></a> [filter\_name](#input\_filter\_name) | Name of all created Log Group Subscription Filters | `string` | `"observe-logs-subscription"` | no |
-| <a name="input_filter_pattern"></a> [filter\_pattern](#input\_filter\_pattern) | The filter pattern to use. For more information, see [Filter and Pattern Syntax](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html)" | `string` | `""` | no |
-| <a name="input_iam_name_prefix"></a> [iam\_name\_prefix](#input\_iam\_name\_prefix) | Prefix used for all created IAM roles and policies | `string` | `"observe-logs-subscription"` | no |
-| <a name="input_iam_role_arn"></a> [iam\_role\_arn](#input\_iam\_role\_arn) | ARN of IAM role to use for Cloudwatch Logs subscription.<br>If this is not specified, then an IAM role is created. | `string` | `""` | no |
-| <a name="input_kinesis_firehose"></a> [kinesis\_firehose](#input\_kinesis\_firehose) | Observe Kinesis Firehose module | <pre>object({<br>    firehose_delivery_stream = object({ arn = string })<br>    firehose_iam_policy      = object({ arn = string })<br>  })</pre> | n/a | yes |
-| <a name="input_lambda_timeout"></a> [lambda\_timeout](#input\_lambda\_timeout) | The amount of time that Lambda allows a function to run before stopping<br>    it. The maximum allowed value is 900 seconds. | `number` | `120` | no |
-| <a name="input_log_group_expiration_in_days"></a> [log\_group\_expiration\_in\_days](#input\_log\_group\_expiration\_in\_days) | Expiration to set on the log group for the lambda created by this stack | `number` | `365` | no |
-| <a name="input_log_group_names"></a> [log\_group\_names](#input\_log\_group\_names) | A list of Cloudwatch Log Groups to subscribe to. Unlike "log\_group\_prefixes",<br>each element of the array corresponds to exactly one subscription filter. | `list(string)` | `[]` | no |
-| <a name="input_log_group_prefixes"></a> [log\_group\_prefixes](#input\_log\_group\_prefixes) | All Cloudwatch Log Groups matching the prefixes in the list will be subscribed to. | `list(string)` | `[]` | no |
-| <a name="input_name"></a> [name](#input\_name) | Module name. Used to determine the name of some resources | `string` | `"observe-logs-subscription"` | no |
+| Name                                                                                                                           | Description                                                                                                                                                             | Type                                                                                                                                              | Default                       | Required |
+| ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | :------: |
+| <a name="input_filter_name"></a> [filter\_name](#input\_filter\_name)                                                          | Name of all created Log Group Subscription Filters                                                                                                                      | `string`                                                                                                                                          | `"observe-logs-subscription"` |    no    |
+| <a name="input_filter_pattern"></a> [filter\_pattern](#input\_filter\_pattern)                                                 | The filter pattern to use. For more information, see [Filter and Pattern Syntax](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html)" | `string`                                                                                                                                          | `""`                          |    no    |
+| <a name="input_iam_name_prefix"></a> [iam\_name\_prefix](#input\_iam\_name\_prefix)                                            | Prefix used for all created IAM roles and policies                                                                                                                      | `string`                                                                                                                                          | `"observe-logs-subscription"` |    no    |
+| <a name="input_iam_role_arn"></a> [iam\_role\_arn](#input\_iam\_role\_arn)                                                     | ARN of IAM role to use for Cloudwatch Logs subscription.<br>If this is not specified, then an IAM role is created.                                                      | `string`                                                                                                                                          | `""`                          |    no    |
+| <a name="input_kinesis_firehose"></a> [kinesis\_firehose](#input\_kinesis\_firehose)                                           | Observe Kinesis Firehose module                                                                                                                                         | <pre>object({<br>    firehose_delivery_stream = object({ arn = string })<br>    firehose_iam_policy      = object({ arn = string })<br>  })</pre> | n/a                           |   yes    |
+| <a name="input_lambda_timeout"></a> [lambda\_timeout](#input\_lambda\_timeout)                                                 | The amount of time that Lambda allows a function to run before stopping<br>    it. The maximum allowed value is 900 seconds.                                            | `number`                                                                                                                                          | `120`                         |    no    |
+| <a name="input_log_group_expiration_in_days"></a> [log\_group\_expiration\_in\_days](#input\_log\_group\_expiration\_in\_days) | Expiration to set on the log group for the lambda created by this stack                                                                                                 | `number`                                                                                                                                          | `365`                         |    no    |
+| <a name="input_log_group_names"></a> [log\_group\_names](#input\_log\_group\_names)                                            | A list of Cloudwatch Log Groups to subscribe to. Unlike "log\_group\_prefixes",<br>each element of the array corresponds to exactly one subscription filter.            | `list(string)`                                                                                                                                    | `[]`                          |    no    |
+| <a name="input_log_group_prefixes"></a> [log\_group\_prefixes](#input\_log\_group\_prefixes)                                   | All Cloudwatch Log Groups matching the prefixes in the list will be subscribed to.                                                                                      | `list(string)`                                                                                                                                    | `[]`                          |    no    |
+| <a name="input_name"></a> [name](#input\_name)                                                                                 | Module name. Used to determine the name of some resources                                                                                                               | `string`                                                                                                                                          | `"observe-logs-subscription"` |    no    |
 
 ## Outputs
 
