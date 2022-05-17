@@ -93,13 +93,15 @@ def modify_subscriptions(client, is_create: str, matches: list, exclusions: list
 
 
 def main(event, context):
-    matches = os.environ['LOG_GROUP_MATCHES'].split(",")
-    exclusions = os.environ['LOG_GROUP_EXCLUDES'].split(",")
+    matchStr = os.environ['LOG_GROUP_MATCHES']
+    exclusionStr = os.environ['LOG_GROUP_EXCLUDES']
     filter_name = os.environ['FILTER_NAME']
     filter_pattern = os.environ['FILTER_PATTERN']
     destination_rn = os.environ['DESTINATION_ARN']
     delivery_role = os.environ['DELIVERY_STREAM_ROLE_ARN']
 
+    matches = matchStr.split(',') if matchStr != "" else []
+    exclusions = exclusionStr.split(',') if exclusionStr != "" else []
     args = SubscriptionArgs(destination_rn, filter_name,
                             filter_pattern, delivery_role)
 

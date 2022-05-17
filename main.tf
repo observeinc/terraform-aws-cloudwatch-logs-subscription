@@ -15,7 +15,7 @@ locals {
 
     # Bump VERSION if we want to re-create the subscription filters even
     # if the user's environment variables haven't changed.
-    "VERSION" = 0
+    "VERSION" = 1
   }
 }
 
