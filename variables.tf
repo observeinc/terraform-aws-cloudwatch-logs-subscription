@@ -1,4 +1,4 @@
-// IMPORTANT: Also update README.md if updating the variables here.
+# IMPORTANT: Also update README.md if updating the variables here.
 
 variable "name" {
   type        = string
