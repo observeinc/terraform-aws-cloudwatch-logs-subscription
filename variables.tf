@@ -21,7 +21,7 @@ variable "log_group_matches" {
     entire log group name must match a pattern.
   EOF
   type        = list(string)
-  default     = []
+  default     = [".*"]
 }
 
 variable "log_group_excludes" {

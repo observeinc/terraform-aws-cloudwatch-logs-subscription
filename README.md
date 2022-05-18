@@ -4,6 +4,8 @@ Terraform module that sets up CloudWatch Log Group Subscription Filters. This
 makes is easier to forward log data towards Observe
 (through the Observe Kinesis Firehose module).
 
+By default, the module will create subscription filters for all log groups.
+
 ## Terraform versions
 
 Terraform 0.13 and newer. Submit pull-requests to `main` branch.
