@@ -1,3 +1,5 @@
+// IMPORTANT: Also update README.md if updating the variables here.
+
 variable "name" {
   type        = string
   default     = "observe-logs-subscription"
@@ -14,8 +16,9 @@ variable "kinesis_firehose" {
 
 variable "log_group_matches" {
   description = <<-EOF
-    A list of regex patterns. If a Log Group matches any regex pattern in the list,
-    it will be subscribed to.
+    A list of regex patterns. If a Log Group fully matches any regex pattern in the list,
+    it will be subscribed to. By "fully matches", we mean that the
+    entire log group name must match a pattern.
   EOF
   type        = list(string)
   default     = []
@@ -23,7 +26,7 @@ variable "log_group_matches" {
 
 variable "log_group_excludes" {
   description = <<-EOF
-    A list of regex patterns. If a Log Group matches any regex pattern in the list, it will
+    A list of regex patterns. If a Log Group fully matches any regex pattern in the list, it will
     not be subscribed to. log_group_excludes takes precedence over log_group_matches.
   EOF
 

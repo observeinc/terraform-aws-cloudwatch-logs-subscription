@@ -29,13 +29,13 @@ module "observe_kinesis_firehose_cloudwatch_logs_subscription" {
   # Collect the log group defined above, all Elastic Beanstalk logs,
   # and API Gateway execution logs
   log_group_matches  = [
-    "^${aws_cloudwatch_log_group.group.name}$",
-    "/aws/elasticbeanstalk/",
-    "API-Gateway-Execution-Logs",
+    aws_cloudwatch_log_group.group.name,
+    "/aws/elasticbeanstalk/.*",
+    "API-Gateway-Execution-Logs.*",
   ]
   
   # Don't collect any Elastic Beanstalk Nginx access logs
-  log_group_excludes = ["^/aws/elasticbeanstalk/.*/var/log/nginx/access.log$"]
+  log_group_excludes = ["/aws/elasticbeanstalk/.*/var/log/nginx/access.log"]
 }
 ```
 

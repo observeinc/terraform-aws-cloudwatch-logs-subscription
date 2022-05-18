@@ -63,13 +63,13 @@ def modify_subscription(client, is_create: bool, log_group_name: str, subscripti
 
 def should_subscribe(name: str, matches: list, exclusions: list) -> bool:
     """should_subscribe checks whether a log group with name 'name' should be subscribed to"""
-    exclude = any([re.search(pattern, name)
+    exclude = any([re.fullmatch(pattern, name)
                    for pattern in exclusions])
     if exclude:
         logging.info(
             'log group %s matches an exclusion regex pattern %s', name, exclusions)
     else:
-        match = any([re.search(pattern, name)
+        match = any([re.fullmatch(pattern, name)
                     for pattern in matches])
         if match:
             return True
