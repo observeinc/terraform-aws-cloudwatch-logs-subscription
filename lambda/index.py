@@ -1,4 +1,5 @@
 import dataclasses
+from errno import errorcode
 import logging
 import os
 import re
@@ -141,8 +142,12 @@ def main(event, context):
                 'Data': str(e)})
     elif is_eventbridge_event:
         logger.info('assuming event is an EventBridge event')
-        name = event['detail']['requestParameters']['logGroupName']
-        if should_subscribe(name, matches, exclusions):
-            _ = modify_subscription(client, True, name, args)
+        if 'errorCode' in event['detail']:
+            logger.info(
+                'CreateLogGroup failed, cannot create subscription filter')
+        else:
+            name = event['detail']['requestParameters']['logGroupName']
+            if should_subscribe(name, matches, exclusions):
+                _ = modify_subscription(client, True, name, args)
     else:
         logger.error('failed to determine event type')
