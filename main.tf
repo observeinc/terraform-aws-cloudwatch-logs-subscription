@@ -4,12 +4,10 @@ locals {
   region    = data.aws_region.current.name
 
   subscription_filter_role_arn = var.iam_role_arn != "" ? var.iam_role_arn : aws_iam_role.subscription_filter[0].arn
-  log_group_prefix_arns = [for prefix in var.log_group_prefixes :
-    "arn:${local.partition}:logs:${local.region}:${local.account}:log-group:${prefix}*"
-  ]
 
   env_vars = {
-    "LOG_GROUP_PREFIXES"       = jsonencode(var.log_group_prefixes)
+    "LOG_GROUP_MATCHES"        = join(",", var.log_group_matches)
+    "LOG_GROUP_EXCLUDES"       = join(",", var.log_group_excludes)
     "DESTINATION_ARN"          = var.kinesis_firehose.firehose_delivery_stream.arn
     "DELIVERY_STREAM_ROLE_ARN" = local.subscription_filter_role_arn
     "FILTER_NAME"              = var.filter_name
@@ -17,7 +15,7 @@ locals {
 
     # Bump VERSION if we want to re-create the subscription filters even
     # if the user's environment variables haven't changed.
-    "VERSION" = 0
+    "VERSION" = 1
   }
 }
 
@@ -53,27 +51,11 @@ resource "aws_iam_role_policy_attachment" "subscription_filter_publish_logs" {
   policy_arn = var.kinesis_firehose.firehose_iam_policy.arn
 }
 
-resource "aws_cloudwatch_log_subscription_filter" "explicit_filters" {
-  count = length(var.log_group_names)
-
-  name            = var.filter_name
-  log_group_name  = var.log_group_names[count.index]
-  filter_pattern  = var.filter_pattern
-  role_arn        = local.subscription_filter_role_arn
-  destination_arn = var.kinesis_firehose.firehose_delivery_stream.arn
-}
-
 resource "aws_lambda_permission" "invoke_lambda" {
-  for_each = {
-    "events.amazonaws.com" = {
-      source_arn = aws_cloudwatch_event_rule.new_log_group.arn
-    }
-  }
-
   function_name = aws_lambda_function.update_log_group_subscriptions.function_name
   action        = "lambda:InvokeFunction"
-  principal     = each.key
-  source_arn    = each.value.source_arn
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.new_log_group.arn
 }
 
 resource "aws_cloudwatch_event_rule" "new_log_group" {
@@ -142,7 +124,7 @@ resource "aws_iam_policy" "subscribe_logs" {
               "logs:DescribeSubscriptionFilters",
               "logs:DeleteSubscriptionFilter"
             ],
-            "Resource": ${jsonencode(local.log_group_prefix_arns)}
+            "Resource": "arn:${local.partition}:logs:${local.region}:${local.account}:log-group:*"
         }
       ]
     }
@@ -150,6 +132,8 @@ resource "aws_iam_policy" "subscribe_logs" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_subscribe_logs" {
+  count = length(aws_iam_policy.subscribe_logs) > 0 ? 1 : 0
+
   role       = aws_iam_role.lambda.name
   policy_arn = aws_iam_policy.subscribe_logs.arn
 }

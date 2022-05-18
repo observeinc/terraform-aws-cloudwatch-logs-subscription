@@ -26,16 +26,16 @@ module "observe_kinesis_firehose_cloudwatch_logs_subscription" {
   source           = "https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription"
   kinesis_firehose = module.observe_kinesis_firehose
 
-  # Collect all Elastic Beanstalk logs and API Gateway execution logs
-  log_group_prefixes  = [
-    "/aws/elasticbeanstalk/",
-    "API-Gateway-Execution-Logs",
+  # Collect the log group defined above, all Elastic Beanstalk logs,
+  # and API Gateway execution logs
+  log_group_matches  = [
+    aws_cloudwatch_log_group.group.name,
+    "/aws/elasticbeanstalk/.*",
+    "API-Gateway-Execution-Logs.*",
   ]
-
-  # Also collect logs from log group defined above
-  log_group_names  = [
-    aws_cloudwatch_log_group.group.name
-  ]
+  
+  # Don't collect any Elastic Beanstalk Nginx access logs
+  log_group_excludes = ["/aws/elasticbeanstalk/.*/var/log/nginx/access.log"]
 }
 ```
 
@@ -71,7 +71,6 @@ No modules.
 | [aws_cloudwatch_event_rule.new_log_group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_rule) | resource |
 | [aws_cloudwatch_event_target.new_log_group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_target) | resource |
 | [aws_cloudwatch_log_group.lambda_log_group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group) | resource |
-| [aws_cloudwatch_log_subscription_filter.explicit_filters](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_subscription_filter) | resource |
 | [aws_iam_policy.pass_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
 | [aws_iam_policy.subscribe_logs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
 | [aws_iam_role.lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
@@ -98,9 +97,9 @@ No modules.
 | <a name="input_iam_role_arn"></a> [iam\_role\_arn](#input\_iam\_role\_arn) | ARN of IAM role to use for Cloudwatch Logs subscription.<br>If this is not specified, then an IAM role is created. | `string` | `""` | no |
 | <a name="input_kinesis_firehose"></a> [kinesis\_firehose](#input\_kinesis\_firehose) | Observe Kinesis Firehose module | <pre>object({<br>    firehose_delivery_stream = object({ arn = string })<br>    firehose_iam_policy      = object({ arn = string })<br>  })</pre> | n/a | yes |
 | <a name="input_lambda_timeout"></a> [lambda\_timeout](#input\_lambda\_timeout) | The amount of time that Lambda allows a function to run before stopping<br>    it. The maximum allowed value is 900 seconds. | `number` | `120` | no |
+| <a name="input_log_group_excludes"></a> [log\_group\_excludes](#input\_log\_group\_excludes) | A list of regex patterns. If a Log Group fully matches any regex pattern in the list, it will<br>not be subscribed to. log\_group\_excludes takes precedence over log\_group\_matches. | `list(string)` | `[]` | no |
 | <a name="input_log_group_expiration_in_days"></a> [log\_group\_expiration\_in\_days](#input\_log\_group\_expiration\_in\_days) | Expiration to set on the log group for the lambda created by this stack | `number` | `365` | no |
-| <a name="input_log_group_names"></a> [log\_group\_names](#input\_log\_group\_names) | A list of Cloudwatch Log Groups to subscribe to. Unlike "log\_group\_prefixes",<br>each element of the array corresponds to exactly one subscription filter. | `list(string)` | `[]` | no |
-| <a name="input_log_group_prefixes"></a> [log\_group\_prefixes](#input\_log\_group\_prefixes) | All Cloudwatch Log Groups matching the prefixes in the list will be subscribed to. | `list(string)` | `[]` | no |
+| <a name="input_log_group_matches"></a> [log\_group\_matches](#input\_log\_group\_matches) | A list of regex patterns. If a Log Group fully matches any regex pattern in the list,<br>it will be subscribed to. By "fully matches", we mean that the<br>entire log group name must match a pattern. | `list(string)` | `[]` | no |
 | <a name="input_name"></a> [name](#input\_name) | Module name. Used to determine the name of some resources | `string` | `"observe-logs-subscription"` | no |
 
 ## Outputs
