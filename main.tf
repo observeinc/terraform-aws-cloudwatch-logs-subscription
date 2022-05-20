@@ -5,7 +5,8 @@ locals {
 
   subscription_filter_role_arn = var.iam_role_arn != "" ? var.iam_role_arn : aws_iam_role.subscription_filter[0].arn
 
-  env_vars = {
+  function_name = var.name
+  function_env_vars = {
     "LOG_GROUP_MATCHES"        = join(",", var.log_group_matches)
     "LOG_GROUP_EXCLUDES"       = join(",", var.log_group_excludes)
     "DESTINATION_ARN"          = var.kinesis_firehose.firehose_delivery_stream.arn
@@ -46,39 +47,14 @@ resource "aws_iam_role" "subscription_filter" {
   EOF
 }
 
-resource "aws_iam_role_policy_attachment" "subscription_filter_publish_logs" {
+resource "aws_iam_role_policy_attachment" "subscription_filter" {
   role       = regex(".*role/(?P<role_name>.*)$", local.subscription_filter_role_arn)["role_name"]
   policy_arn = var.kinesis_firehose.firehose_iam_policy.arn
 }
 
-resource "aws_lambda_permission" "invoke_lambda" {
-  function_name = aws_lambda_function.update_log_group_subscriptions.function_name
-  action        = "lambda:InvokeFunction"
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.new_log_group.arn
-}
-
-resource "aws_cloudwatch_event_rule" "new_log_group" {
-  name_prefix   = var.name
-  description   = "Rule to listen for new log groups and trigger the log group subscriber lambda"
-  event_pattern = <<-EOF
-    {
-      "source": ["aws.logs"],
-      "detail-type": ["AWS API Call via CloudTrail"],
-      "detail": {
-        "eventSource": ["logs.amazonaws.com"],
-        "eventName": ["CreateLogGroup"]
-      }
-    }
-  EOF
-}
-
-resource "aws_cloudwatch_event_target" "new_log_group" {
-  target_id = aws_lambda_function.update_log_group_subscriptions.id
-  rule      = aws_cloudwatch_event_rule.new_log_group.name
-  arn       = aws_lambda_function.update_log_group_subscriptions.arn
-
-  depends_on = [aws_lambda_permission.invoke_lambda]
+resource "aws_cloudwatch_log_group" "lambda" {
+  name              = "/aws/lambda/${local.function_name}"
+  retention_in_days = var.log_group_expiration_in_days
 }
 
 resource "aws_iam_role" "lambda" {
@@ -100,7 +76,7 @@ resource "aws_iam_role" "lambda" {
   EOF
 }
 
-resource "aws_iam_policy" "subscribe_logs" {
+resource "aws_iam_policy" "lambda" {
   name_prefix = var.iam_name_prefix
   policy      = <<-EOF
     {
@@ -110,67 +86,38 @@ resource "aws_iam_policy" "subscribe_logs" {
             "Sid": "",
             "Effect": "Allow",
             "Action": [
-              "logs:DescribeLogGroups"
-            ],
-            "Resource": [
-              "arn:${local.partition}:logs:${local.region}:${local.account}:log-group:*"
-            ]
-        },
-        {
-            "Sid": "",
-            "Effect": "Allow",
-            "Action": [
+              "logs:DescribeLogGroups",
               "logs:PutSubscriptionFilter",
               "logs:DescribeSubscriptionFilters",
               "logs:DeleteSubscriptionFilter"
             ],
             "Resource": "arn:${local.partition}:logs:${local.region}:${local.account}:log-group:*"
+        },
+        {
+          "Sid": "",
+          "Effect": "Allow",
+          "Action": [
+            "iam:PassRole"
+          ],
+          "Resource": "${local.subscription_filter_role_arn}"
+        },
+        {
+          "Effect": "Allow",
+          "Action": [
+            "logs:DescribeLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          "Resource": "${aws_cloudwatch_log_group.lambda.arn}*"
         }
       ]
     }
   EOF
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_subscribe_logs" {
-  count = length(aws_iam_policy.subscribe_logs) > 0 ? 1 : 0
-
+resource "aws_iam_role_policy_attachment" "lambda" {
   role       = aws_iam_role.lambda.name
-  policy_arn = aws_iam_policy.subscribe_logs.arn
-}
-
-resource "aws_iam_policy" "pass_role" {
-  name_prefix = var.iam_name_prefix
-  policy      = <<-EOF
-      {
-        "Version": "2012-10-17",
-        "Statement": [
-          {
-              "Sid": "",
-              "Effect": "Allow",
-              "Action": [
-                "iam:PassRole"
-              ],
-              "Resource": [
-                  "${local.subscription_filter_role_arn}"
-              ]
-          }
-        ]
-      }
-  EOF
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_pass_role" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = aws_iam_policy.pass_role.arn
-}
-
-data "aws_iam_policy" "lambda_basic_execution" {
-  arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_lambda_basic_execution" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = data.aws_iam_policy.lambda_basic_execution.arn
+  policy_arn = aws_iam_policy.lambda.arn
 }
 
 data "archive_file" "lambda_code" {
@@ -179,8 +126,8 @@ data "archive_file" "lambda_code" {
   output_path = "${path.module}/files/lambda.zip"
 }
 
-resource "aws_lambda_function" "update_log_group_subscriptions" {
-  function_name = var.name
+resource "aws_lambda_function" "lambda" {
+  function_name = local.function_name
   role          = aws_iam_role.lambda.arn
 
   description = <<-EOF
@@ -188,7 +135,7 @@ resource "aws_lambda_function" "update_log_group_subscriptions" {
   EOF
 
   environment {
-    variables = local.env_vars
+    variables = local.function_env_vars
   }
 
   runtime = "python3.9"
@@ -197,18 +144,19 @@ resource "aws_lambda_function" "update_log_group_subscriptions" {
 
   filename         = data.archive_file.lambda_code.output_path
   source_code_hash = data.archive_file.lambda_code.output_base64sha256
-}
 
-resource "aws_cloudwatch_log_group" "lambda_log_group" {
-  name              = "/aws/lambda/${aws_lambda_function.update_log_group_subscriptions.function_name}"
-  retention_in_days = var.log_group_expiration_in_days
+  depends_on = [
+    aws_iam_role_policy_attachment.subscription_filter,
+    aws_iam_role_policy_attachment.lambda,
+    aws_cloudwatch_log_group.lambda,
+  ]
 }
 
 resource "aws_cloudformation_stack" "lambda_trigger" {
-  name = "${var.name}-${sha256(jsonencode(local.env_vars))}"
+  name = "${var.name}-${sha256(jsonencode(local.function_env_vars))}"
 
   parameters = {
-    "LambdaArn" = aws_lambda_function.update_log_group_subscriptions.arn
+    "LambdaArn" = aws_lambda_function.lambda.arn
   }
 
   template_body = <<-EOF
@@ -225,6 +173,34 @@ resource "aws_cloudformation_stack" "lambda_trigger" {
           Description: On stack creation, add subscriptions to all existing log groups that match the specified filters. On deletion, remove all subscriptions added by this template.
           ServiceToken: !Ref LambdaArn
   EOF
+}
 
-  depends_on = [aws_iam_policy.subscribe_logs]
+resource "aws_cloudwatch_event_rule" "event_rule" {
+  name_prefix   = var.name
+  description   = "Rule to listen for new log groups and trigger the log group subscriber lambda"
+  event_pattern = <<-EOF
+    {
+      "source": ["aws.logs"],
+      "detail-type": ["AWS API Call via CloudTrail"],
+      "detail": {
+        "eventSource": ["logs.amazonaws.com"],
+        "eventName": ["CreateLogGroup"]
+      }
+    }
+  EOF
+}
+
+resource "aws_lambda_permission" "event_rule" {
+  function_name = aws_lambda_function.lambda.function_name
+  action        = "lambda:InvokeFunction"
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.event_rule.arn
+}
+
+resource "aws_cloudwatch_event_target" "event_rule" {
+  target_id = aws_lambda_function.lambda.id
+  rule      = aws_cloudwatch_event_rule.event_rule.name
+  arn       = aws_lambda_function.lambda.arn
+
+  depends_on = [aws_lambda_permission.event_rule]
 }
