@@ -5,9 +5,10 @@ locals {
 
   subscription_filter_role_arn = var.iam_role_arn != "" ? var.iam_role_arn : aws_iam_role.subscription_filter[0].arn
 
-  function_name = var.name
+  function_name     = var.name
+  log_group_matches = var.subscribe_self ? concat(var.log_group_matches, "/aws/lambda/${local.function_name}") : var.log_group_matches
   function_env_vars = {
-    "LOG_GROUP_MATCHES"        = join(",", var.log_group_matches)
+    "LOG_GROUP_MATCHES"        = join(",", local.log_group_matches)
     "LOG_GROUP_EXCLUDES"       = join(",", var.log_group_excludes)
     "DESTINATION_ARN"          = var.kinesis_firehose.firehose_delivery_stream.arn
     "DELIVERY_STREAM_ROLE_ARN" = local.subscription_filter_role_arn

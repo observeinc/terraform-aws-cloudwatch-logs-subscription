@@ -84,3 +84,9 @@ variable "lambda_timeout" {
   type        = number
   default     = 120
 }
+
+variable "subscribe_self" {
+  description = "If true, subscribe to all log groups created by this module"
+  type        = bool
+  default     = false
+}
