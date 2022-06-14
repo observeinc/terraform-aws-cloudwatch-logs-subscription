@@ -159,7 +159,8 @@ resource "aws_cloudformation_stack" "lambda_trigger" {
     "LambdaArn" = aws_lambda_function.lambda.arn
   }
 
-  template_body = <<-EOF
+  timeout_in_minutes = var.lambda_timeout + 1
+  template_body      = <<-EOF
     AWSTemplateFormatVersion: 2010-09-09
     Parameters:
       LambdaArn:
