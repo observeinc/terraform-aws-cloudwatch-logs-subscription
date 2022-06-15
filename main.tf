@@ -59,6 +59,10 @@ resource "aws_cloudwatch_log_group" "lambda" {
   retention_in_days = var.log_group_expiration_in_days
 }
 
+resource "aws_cloudwatch_event_bus" "this" {
+  name = var.name
+}
+
 resource "aws_iam_role" "lambda" {
   name_prefix        = var.iam_name_prefix
   description        = "Role for the log group subscriber lambda"
@@ -78,9 +82,6 @@ resource "aws_iam_role" "lambda" {
   EOF
 }
 
-resource "aws_cloudwatch_event_bus" "this" {
-  name = var.name
-}
 resource "aws_iam_policy" "lambda" {
   name_prefix = var.iam_name_prefix
   policy      = <<-EOF
@@ -165,32 +166,6 @@ resource "aws_lambda_function" "lambda" {
   ]
 }
 
-resource "aws_cloudformation_stack" "lambda_trigger" {
-  name = "${var.name}-${sha256(jsonencode(local.function_env_vars))}"
-
-  parameters = {
-    "LambdaArn" = aws_lambda_function.lambda.arn
-  }
-
-  timeout_in_minutes = var.lambda_timeout + 1
-  template_body      = <<-EOF
-    AWSTemplateFormatVersion: 2010-09-09
-    Parameters:
-      LambdaArn:
-        Type: "String"
-        Default: ""
-        Description: "The ARN of the Lambda to trigger"
-    Resources:
-      InitialLambdaTrigger:
-        Type: Custom::InitialLambdaTrigger
-        Properties:
-          Description: On stack creation, add subscriptions to all existing log groups that match the specified filters. On deletion, remove all subscriptions added by this template.
-          ServiceToken: !Ref LambdaArn
-  EOF
-
-  depends_on = [aws_cloudwatch_event_target.event_rules]
-}
-
 resource "aws_cloudwatch_event_rule" "new_log_groups" {
   name          = "${var.name}-new-log-groups"
   description   = "Rule to listen for new log groups from aws.logs"
@@ -218,7 +193,6 @@ resource "aws_cloudwatch_event_rule" "pagination" {
   EOF
 }
 
-
 resource "aws_lambda_permission" "event_rules" {
   for_each = {
     new_logs   = aws_cloudwatch_event_rule.new_log_groups
@@ -242,4 +216,30 @@ resource "aws_cloudwatch_event_target" "event_rules" {
 
   arn        = aws_lambda_function.lambda.arn
   depends_on = [aws_lambda_permission.event_rules]
+}
+
+resource "aws_cloudformation_stack" "lambda_trigger" {
+  name = "${var.name}-${sha256(jsonencode(local.function_env_vars))}"
+
+  parameters = {
+    "LambdaArn" = aws_lambda_function.lambda.arn
+  }
+
+  timeout_in_minutes = var.lambda_timeout + 1
+  template_body      = <<-EOF
+    AWSTemplateFormatVersion: 2010-09-09
+    Parameters:
+      LambdaArn:
+        Type: "String"
+        Default: ""
+        Description: "The ARN of the Lambda to trigger"
+    Resources:
+      InitialLambdaTrigger:
+        Type: Custom::InitialLambdaTrigger
+        Properties:
+          Description: On stack creation, add subscriptions to all existing log groups that match the specified filters. On deletion, remove all subscriptions added by this template.
+          ServiceToken: !Ref LambdaArn
+  EOF
+
+  depends_on = [aws_cloudwatch_event_target.event_rules]
 }
