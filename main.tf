@@ -14,6 +14,8 @@ locals {
     "FILTER_NAME"              = var.filter_name
     "FILTER_PATTERN"           = var.filter_pattern
 
+    "EVENTBRIDGE_EVENT_BUS" = aws_cloudwatch_event_bus.this.name
+
     # Bump VERSION if we want to re-create the subscription filters even
     # if the user's environment variables haven't changed.
     "VERSION" = 1
@@ -76,6 +78,9 @@ resource "aws_iam_role" "lambda" {
   EOF
 }
 
+resource "aws_cloudwatch_event_bus" "this" {
+  name = var.name
+}
 resource "aws_iam_policy" "lambda" {
   name_prefix = var.iam_name_prefix
   policy      = <<-EOF
@@ -100,6 +105,14 @@ resource "aws_iam_policy" "lambda" {
             "iam:PassRole"
           ],
           "Resource": "${local.subscription_filter_role_arn}"
+        },
+        {
+          "Sid": "",
+          "Effect": "Allow",
+          "Action": [
+            "events:PutEvents"
+          ],
+          "Resource": "${aws_cloudwatch_event_bus.this.arn}"
         },
         {
           "Effect": "Allow",
@@ -174,11 +187,13 @@ resource "aws_cloudformation_stack" "lambda_trigger" {
           Description: On stack creation, add subscriptions to all existing log groups that match the specified filters. On deletion, remove all subscriptions added by this template.
           ServiceToken: !Ref LambdaArn
   EOF
+
+  depends_on = [aws_cloudwatch_event_target.event_rules]
 }
 
-resource "aws_cloudwatch_event_rule" "event_rule" {
-  name_prefix   = var.name
-  description   = "Rule to listen for new log groups and trigger the log group subscriber lambda"
+resource "aws_cloudwatch_event_rule" "new_log_groups" {
+  name          = "${var.name}-new-log-groups"
+  description   = "Rule to listen for new log groups from aws.logs"
   event_pattern = <<-EOF
     {
       "source": ["aws.logs"],
@@ -191,17 +206,40 @@ resource "aws_cloudwatch_event_rule" "event_rule" {
   EOF
 }
 
-resource "aws_lambda_permission" "event_rule" {
+resource "aws_cloudwatch_event_rule" "pagination" {
+  name           = "${var.name}-pagination"
+  description    = "Rule to listen for pagination events from the Lambda function itself"
+  event_bus_name = aws_cloudwatch_event_bus.this.name
+  event_pattern  = <<-EOF
+    {
+      "source": ["com.observeinc.autosubscribe"],
+      "detail-type": ["pagination"]
+    }
+  EOF
+}
+
+
+resource "aws_lambda_permission" "event_rules" {
+  for_each = {
+    new_logs   = aws_cloudwatch_event_rule.new_log_groups
+    pagination = aws_cloudwatch_event_rule.pagination
+  }
+
   function_name = aws_lambda_function.lambda.function_name
   action        = "lambda:InvokeFunction"
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.event_rule.arn
+  source_arn    = each.value.arn
 }
 
-resource "aws_cloudwatch_event_target" "event_rule" {
-  target_id = aws_lambda_function.lambda.id
-  rule      = aws_cloudwatch_event_rule.event_rule.name
-  arn       = aws_lambda_function.lambda.arn
+resource "aws_cloudwatch_event_target" "event_rules" {
+  for_each = {
+    new_logs   = aws_cloudwatch_event_rule.new_log_groups
+    pagination = aws_cloudwatch_event_rule.pagination
+  }
 
-  depends_on = [aws_lambda_permission.event_rule]
+  rule           = each.value.name
+  event_bus_name = each.value.event_bus_name
+
+  arn        = aws_lambda_function.lambda.arn
+  depends_on = [aws_lambda_permission.event_rules]
 }
