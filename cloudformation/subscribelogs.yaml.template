@@ -70,10 +70,6 @@ Resources:
         - - /aws/lambda/
           - !Ref "AWS::StackName"
       RetentionInDays: !Ref LogGroupExpirationInDays
-  PaginationEventBus:
-    Type: "AWS::Events::EventBus"
-    Properties:
-      Name: !Ref AWS::StackName
   LambdaRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -118,7 +114,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - "events:PutEvents"
-                Resource: !GetAtt PaginationEventBus.Arn
+                Resource: !Sub "arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default"
         - PolicyName: WriteLogsPolicy
           PolicyDocument:
             Version: 2012-10-17
@@ -155,7 +151,6 @@ Resources:
               - Fn::ImportValue: !Sub "${CollectionStackName}:logs:role:arn"
           FILTER_NAME: !Ref FilterName
           FILTER_PATTERN: !Ref FilterPattern
-          EVENTBRIDGE_EVENT_BUS: !Ref PaginationEventBus
       Runtime: python3.9
       Timeout: !Ref LambdaTimeout
       Handler: index.main
@@ -185,7 +180,6 @@ Resources:
     Type: "AWS::Events::Rule"
     Properties:
       Description: Rule to listen for pagination events
-      EventBusName: !Ref PaginationEventBus
       EventPattern:
         source:
           - "com.observeinc.autosubscribe"

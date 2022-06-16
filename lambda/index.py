@@ -161,7 +161,6 @@ def main(event, context):
     filter_pattern = os.environ['FILTER_PATTERN']
     destination_rn = os.environ['DESTINATION_ARN']
     delivery_role = os.environ['DELIVERY_STREAM_ROLE_ARN']
-    event_bus = os.environ['EVENTBRIDGE_EVENT_BUS']
 
     matches = matchStr.split(',') if matchStr != "" else []
     exclusions = exclusionStr.split(',') if exclusionStr != "" else []
@@ -209,7 +208,6 @@ def main(event, context):
                             'cfnEvent': cfnEvent,
                             'next': next_log_group,
                         }),
-                        'EventBusName': event_bus,
                     }
                     eventsClient.put_events(Entries=[entry])
             else:

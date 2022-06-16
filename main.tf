@@ -14,8 +14,6 @@ locals {
     "FILTER_NAME"              = var.filter_name
     "FILTER_PATTERN"           = var.filter_pattern
 
-    "EVENTBRIDGE_EVENT_BUS" = aws_cloudwatch_event_bus.this.name
-
     # Bump VERSION if we want to re-create the subscription filters even
     # if the user's environment variables haven't changed.
     "VERSION" = 1
@@ -57,10 +55,6 @@ resource "aws_iam_role_policy_attachment" "subscription_filter" {
 resource "aws_cloudwatch_log_group" "lambda" {
   name              = "/aws/lambda/${local.function_name}"
   retention_in_days = var.log_group_expiration_in_days
-}
-
-resource "aws_cloudwatch_event_bus" "this" {
-  name = var.name
 }
 
 resource "aws_iam_role" "lambda" {
@@ -113,7 +107,7 @@ resource "aws_iam_policy" "lambda" {
           "Action": [
             "events:PutEvents"
           ],
-          "Resource": "${aws_cloudwatch_event_bus.this.arn}"
+          "Resource": "arn:${local.partition}:events:${local.region}:${local.account}:event-bus/default"
         },
         {
           "Effect": "Allow",
@@ -184,7 +178,6 @@ resource "aws_cloudwatch_event_rule" "new_log_groups" {
 resource "aws_cloudwatch_event_rule" "pagination" {
   name           = "${var.name}-pagination"
   description    = "Rule to listen for pagination events from the Lambda function itself"
-  event_bus_name = aws_cloudwatch_event_bus.this.name
   event_pattern  = <<-EOF
     {
       "source": ["com.observeinc.autosubscribe"],
@@ -212,7 +205,6 @@ resource "aws_cloudwatch_event_target" "event_rules" {
   }
 
   rule           = each.value.name
-  event_bus_name = each.value.event_bus_name
 
   arn        = aws_lambda_function.lambda.arn
   depends_on = [aws_lambda_permission.event_rules]
