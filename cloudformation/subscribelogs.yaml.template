@@ -94,7 +94,7 @@ Resources:
                   - "logs:PutSubscriptionFilter"
                   - "logs:DescribeSubscriptionFilters"
                   - "logs:DeleteSubscriptionFilter"
-                Resource: !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*"
+                Resource: !Sub "arn:$${AWS::Partition}:logs:$${AWS::Region}:$${AWS::AccountId}:log-group:*"
         - PolicyName: PassRolePolicy
           PolicyDocument:
             Version: 2012-10-17
@@ -106,7 +106,7 @@ Resources:
                   "Fn::If":
                     - HasDeliveryStreamRoleArnOverride
                     - !Ref DeliveryStreamRoleArnOverride
-                    - Fn::ImportValue: !Sub "${CollectionStackName}:logs:role:arn"
+                    - Fn::ImportValue: !Sub "$${CollectionStackName}:logs:role:arn"
         - PolicyName: PutEventsPolicy
           PolicyDocument:
             Version: 2012-10-17
@@ -114,7 +114,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - "events:PutEvents"
-                Resource: !Sub "arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default"
+                Resource: !Sub "arn:$${AWS::Partition}:events:$${AWS::Region}:$${AWS::AccountId}:event-bus/default"
         - PolicyName: WriteLogsPolicy
           PolicyDocument:
             Version: 2012-10-17
@@ -125,7 +125,7 @@ Resources:
                   - "logs:CreateLogStream"
                   - "logs:PutLogEvents"
                 Resource: !Sub
-                  - "${Arn}*"
+                  - "$${Arn}*"
                   - Arn: !GetAtt LambdaLogGroup.Arn
   LogGroupSubscriberLambda:
     Type: "AWS::Lambda::Function"
@@ -143,12 +143,12 @@ Resources:
             "Fn::If":
               - HasDestinationArnOverride
               - !Ref DestinationArnOverride
-              - Fn::ImportValue: !Sub "${CollectionStackName}:firehose:arn"
+              - Fn::ImportValue: !Sub "$${CollectionStackName}:firehose:arn"
           DELIVERY_STREAM_ROLE_ARN:
             "Fn::If":
               - HasDeliveryStreamRoleArnOverride
               - !Ref DeliveryStreamRoleArnOverride
-              - Fn::ImportValue: !Sub "${CollectionStackName}:logs:role:arn"
+              - Fn::ImportValue: !Sub "$${CollectionStackName}:logs:role:arn"
           FILTER_NAME: !Ref FilterName
           FILTER_PATTERN: !Ref FilterPattern
       Runtime: python3.9
@@ -157,7 +157,7 @@ Resources:
       # https://aws.amazon.com/blogs/infrastructure-and-automation/how-to-automatically-subscribe-to-amazon-cloudwatch-logs-groups/
       Code:
         ZipFile: |
-{{ .CODE }}
+          ${code}
   NewLogGroupEventRule:
     Type: "AWS::Events::Rule"
     Properties:
