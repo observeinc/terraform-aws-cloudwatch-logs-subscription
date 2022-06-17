@@ -146,9 +146,10 @@ resource "aws_lambda_function" "lambda" {
     variables = local.function_env_vars
   }
 
-  runtime = "python3.9"
-  timeout = var.lambda_timeout
-  handler = "index.main"
+  runtime     = "python3.9"
+  timeout     = var.lambda_timeout
+  memory_size = var.lambda_memory
+  handler     = "index.main"
 
   filename         = data.archive_file.lambda_code.output_path
   source_code_hash = data.archive_file.lambda_code.output_base64sha256

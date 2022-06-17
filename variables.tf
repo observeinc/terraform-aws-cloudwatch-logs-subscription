@@ -82,5 +82,14 @@ variable "lambda_timeout" {
     it. The maximum allowed value is 900 seconds.
   EOF
   type        = number
-  default     = 120
+  default     = 300
+}
+
+variable "lambda_memory" {
+  description = <<-EOF
+    The amount of memory available to the Lambda function, in megabytes.
+    See https://docs.aws.amazon.com/lambda/latest/operatorguide/computing-power.html for more info.
+  EOF
+  type        = number
+  default     = 128
 }
