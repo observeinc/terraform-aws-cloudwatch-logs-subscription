@@ -77,7 +77,7 @@ variable "log_group_expiration_in_days" {
 }
 
 variable "lambda_timeout" {
-  description = <<EOF
+  description = <<-EOF
     The amount of time that Lambda allows a function to run before stopping
     it. The maximum allowed value is 900 seconds.
   EOF

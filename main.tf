@@ -176,9 +176,9 @@ resource "aws_cloudwatch_event_rule" "new_log_groups" {
 }
 
 resource "aws_cloudwatch_event_rule" "pagination" {
-  name           = "${var.name}-pagination"
-  description    = "Rule to listen for pagination events from the Lambda function itself"
-  event_pattern  = <<-EOF
+  name          = "${var.name}-pagination"
+  description   = "Rule to listen for pagination events from the Lambda function itself"
+  event_pattern = <<-EOF
     {
       "source": ["com.observeinc.autosubscribe"],
       "detail-type": ["pagination"]
@@ -204,7 +204,7 @@ resource "aws_cloudwatch_event_target" "event_rules" {
     pagination = aws_cloudwatch_event_rule.pagination
   }
 
-  rule           = each.value.name
+  rule = each.value.name
 
   arn        = aws_lambda_function.lambda.arn
   depends_on = [aws_lambda_permission.event_rules]
