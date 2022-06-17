@@ -77,10 +77,19 @@ variable "log_group_expiration_in_days" {
 }
 
 variable "lambda_timeout" {
-  description = <<EOF
+  description = <<-EOF
     The amount of time that Lambda allows a function to run before stopping
     it. The maximum allowed value is 900 seconds.
   EOF
   type        = number
-  default     = 120
+  default     = 300
+}
+
+variable "lambda_memory" {
+  description = <<-EOF
+    The amount of memory available to the Lambda function, in megabytes.
+    See https://docs.aws.amazon.com/lambda/latest/operatorguide/computing-power.html for more info.
+  EOF
+  type        = number
+  default     = 128
 }

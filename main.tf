@@ -102,6 +102,14 @@ resource "aws_iam_policy" "lambda" {
           "Resource": "${local.subscription_filter_role_arn}"
         },
         {
+          "Sid": "",
+          "Effect": "Allow",
+          "Action": [
+            "events:PutEvents"
+          ],
+          "Resource": "arn:${local.partition}:events:${local.region}:${local.account}:event-bus/default"
+        },
+        {
           "Effect": "Allow",
           "Action": [
             "logs:DescribeLogGroup",
@@ -123,7 +131,7 @@ resource "aws_iam_role_policy_attachment" "lambda" {
 data "archive_file" "lambda_code" {
   type        = "zip"
   source_dir  = "${path.module}/lambda/"
-  output_path = "${path.module}/files/lambda.zip"
+  output_path = "${path.module}/generated/lambda.zip"
 }
 
 resource "aws_lambda_function" "lambda" {
@@ -138,9 +146,10 @@ resource "aws_lambda_function" "lambda" {
     variables = local.function_env_vars
   }
 
-  runtime = "python3.9"
-  timeout = var.lambda_timeout
-  handler = "index.main"
+  runtime     = "python3.9"
+  timeout     = var.lambda_timeout
+  memory_size = var.lambda_memory
+  handler     = "index.main"
 
   filename         = data.archive_file.lambda_code.output_path
   source_code_hash = data.archive_file.lambda_code.output_base64sha256
@@ -152,6 +161,56 @@ resource "aws_lambda_function" "lambda" {
   ]
 }
 
+resource "aws_cloudwatch_event_rule" "new_log_groups" {
+  name          = "${var.name}-new-log-groups"
+  description   = "Rule to listen for new log groups from aws.logs"
+  event_pattern = <<-EOF
+    {
+      "source": ["aws.logs"],
+      "detail-type": ["AWS API Call via CloudTrail"],
+      "detail": {
+        "eventSource": ["logs.amazonaws.com"],
+        "eventName": ["CreateLogGroup"]
+      }
+    }
+  EOF
+}
+
+resource "aws_cloudwatch_event_rule" "pagination" {
+  name          = "${var.name}-pagination"
+  description   = "Rule to listen for pagination events from the Lambda function itself"
+  event_pattern = <<-EOF
+    {
+      "source": ["com.observeinc.autosubscribe"],
+      "detail-type": ["pagination"]
+    }
+  EOF
+}
+
+resource "aws_lambda_permission" "event_rules" {
+  for_each = {
+    new_logs   = aws_cloudwatch_event_rule.new_log_groups
+    pagination = aws_cloudwatch_event_rule.pagination
+  }
+
+  function_name = aws_lambda_function.lambda.function_name
+  action        = "lambda:InvokeFunction"
+  principal     = "events.amazonaws.com"
+  source_arn    = each.value.arn
+}
+
+resource "aws_cloudwatch_event_target" "event_rules" {
+  for_each = {
+    new_logs   = aws_cloudwatch_event_rule.new_log_groups
+    pagination = aws_cloudwatch_event_rule.pagination
+  }
+
+  rule = each.value.name
+
+  arn        = aws_lambda_function.lambda.arn
+  depends_on = [aws_lambda_permission.event_rules]
+}
+
 resource "aws_cloudformation_stack" "lambda_trigger" {
   name = "${var.name}-${sha256(jsonencode(local.function_env_vars))}"
 
@@ -159,7 +218,8 @@ resource "aws_cloudformation_stack" "lambda_trigger" {
     "LambdaArn" = aws_lambda_function.lambda.arn
   }
 
-  template_body = <<-EOF
+  timeout_in_minutes = var.lambda_timeout + 1
+  template_body      = <<-EOF
     AWSTemplateFormatVersion: 2010-09-09
     Parameters:
       LambdaArn:
@@ -173,34 +233,6 @@ resource "aws_cloudformation_stack" "lambda_trigger" {
           Description: On stack creation, add subscriptions to all existing log groups that match the specified filters. On deletion, remove all subscriptions added by this template.
           ServiceToken: !Ref LambdaArn
   EOF
-}
 
-resource "aws_cloudwatch_event_rule" "event_rule" {
-  name_prefix   = var.name
-  description   = "Rule to listen for new log groups and trigger the log group subscriber lambda"
-  event_pattern = <<-EOF
-    {
-      "source": ["aws.logs"],
-      "detail-type": ["AWS API Call via CloudTrail"],
-      "detail": {
-        "eventSource": ["logs.amazonaws.com"],
-        "eventName": ["CreateLogGroup"]
-      }
-    }
-  EOF
-}
-
-resource "aws_lambda_permission" "event_rule" {
-  function_name = aws_lambda_function.lambda.function_name
-  action        = "lambda:InvokeFunction"
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.event_rule.arn
-}
-
-resource "aws_cloudwatch_event_target" "event_rule" {
-  target_id = aws_lambda_function.lambda.id
-  rule      = aws_cloudwatch_event_rule.event_rule.name
-  arn       = aws_lambda_function.lambda.arn
-
-  depends_on = [aws_lambda_permission.event_rule]
+  depends_on = [aws_cloudwatch_event_target.event_rules]
 }

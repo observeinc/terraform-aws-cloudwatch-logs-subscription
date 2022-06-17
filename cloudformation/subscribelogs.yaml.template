@@ -1,0 +1,220 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  CollectionStackName:
+    Type: "String"
+    Description: "The name of the CloudFormation stack applied from the collection template in https://docs.observeinc.com/en/latest/content/data-ingestion/integrations/aws.html"
+  LogGroupMatches:
+    Type: "String"
+    Default: ".*"
+    Description: >-
+      A comma-separated list of regex patterns. If a Log Group fully matches any regex pattern in the list,
+      it will be subscribed to. By "fully matches", we mean that the
+      entire log group name must match a pattern.
+  LogGroupExcludes:
+    Type: "String"
+    Default: ""
+    Description: >-
+      A list of regex patterns. If a Log Group fully matches any regex pattern in the list, it will
+      not be subscribed to. LogGroupExcludes takes precedence over LogGroupMatches.
+  FilterPattern:
+    Type: "String"
+    Default: ""
+    Description: >-
+      The filter pattern to use. For more information, see https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html
+  FilterName:
+    Type: "String"
+    Default: "observe-logs-subscription"
+    Description: "Name of all created Log Group Subscription Filters"
+  LogGroupExpirationInDays:
+    Type: Number
+    Default: 365
+    AllowedValues:
+      - 1
+      - 3
+      - 7
+      - 14
+      - 30
+      - 90
+      - 365
+    Description: |
+      Expiration to set on the log group for the lambda created by this stack
+  LambdaTimeout:
+    Type: Number
+    Default: 120
+    Description: >-
+      The amount of time that Lambda allows a function to run before stopping
+      it. The maximum allowed value is 900 seconds.
+  LambdaMemory:
+    Type: Number
+    Default: 128
+    Description: >-
+      The amount of memory available to the Lambda function, in megabytes.
+      See https://docs.aws.amazon.com/lambda/latest/operatorguide/computing-power.html for more info.
+  DestinationArnOverride:
+    Type: String
+    Default: ""
+    Description: >-
+      If not an empty string, the subscription filters will send logs to the
+      destination specified by this ARN
+  DeliveryStreamRoleArnOverride:
+    Type: String
+    Default: ""
+    Description: >-
+      If not an empty string, the subscription filters will use this role to
+      send logs to the destination.
+Conditions:
+  HasDestinationArnOverride: !Not
+    - !Equals [!Ref DestinationArnOverride, ""]
+  HasDeliveryStreamRoleArnOverride: !Not
+    - !Equals [!Ref DeliveryStreamRoleArnOverride, ""]
+Resources:
+  LambdaLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    Properties:
+      LogGroupName: !Join
+        - ""
+        - - /aws/lambda/
+          - !Ref "AWS::StackName"
+      RetentionInDays: !Ref LogGroupExpirationInDays
+  LambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Description: Role for LogGroupSubscriberLambda
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: SubscribeLogsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:DescribeLogGroups"
+                  - "logs:PutSubscriptionFilter"
+                  - "logs:DescribeSubscriptionFilters"
+                  - "logs:DeleteSubscriptionFilter"
+                Resource: !Sub "arn:$${AWS::Partition}:logs:$${AWS::Region}:$${AWS::AccountId}:log-group:*"
+        - PolicyName: PassRolePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "iam:PassRole"
+                Resource:
+                  "Fn::If":
+                    - HasDeliveryStreamRoleArnOverride
+                    - !Ref DeliveryStreamRoleArnOverride
+                    - Fn::ImportValue: !Sub "$${CollectionStackName}:logs:role:arn"
+        - PolicyName: PutEventsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "events:PutEvents"
+                Resource: !Sub "arn:$${AWS::Partition}:events:$${AWS::Region}:$${AWS::AccountId}:event-bus/default"
+        - PolicyName: WriteLogsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:DescribeLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: !Sub
+                  - "$${Arn}*"
+                  - Arn: !GetAtt LambdaLogGroup.Arn
+  LogGroupSubscriberLambda:
+    Type: "AWS::Lambda::Function"
+    DependsOn:
+      - LambdaLogGroup
+    Properties:
+      FunctionName: !Ref "AWS::StackName"
+      Description: Look at all specified log groups and add/remove subscriptions filters if necessary
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          LOG_GROUP_MATCHES: !Ref LogGroupMatches
+          LOG_GROUP_EXCLUDES: !Ref LogGroupExcludes
+          DESTINATION_ARN:
+            "Fn::If":
+              - HasDestinationArnOverride
+              - !Ref DestinationArnOverride
+              - Fn::ImportValue: !Sub "$${CollectionStackName}:firehose:arn"
+          DELIVERY_STREAM_ROLE_ARN:
+            "Fn::If":
+              - HasDeliveryStreamRoleArnOverride
+              - !Ref DeliveryStreamRoleArnOverride
+              - Fn::ImportValue: !Sub "$${CollectionStackName}:logs:role:arn"
+          FILTER_NAME: !Ref FilterName
+          FILTER_PATTERN: !Ref FilterPattern
+      Runtime: python3.9
+      Timeout: !Ref LambdaTimeout
+      MemorySize: !Ref LambdaMemory
+      Handler: index.main
+      # https://aws.amazon.com/blogs/infrastructure-and-automation/how-to-automatically-subscribe-to-amazon-cloudwatch-logs-groups/
+      Code:
+        ZipFile: |
+          ${code}
+  NewLogGroupEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: Rule to listen for new log groups and start LogGroupSubscriberLambda
+      EventPattern:
+        source:
+          - "aws.logs"
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "logs.amazonaws.com"
+          eventName:
+            - "CreateLogGroup"
+      State: "ENABLED"
+      Targets:
+        - Arn: !GetAtt LogGroupSubscriberLambda.Arn
+          Id: !Ref LogGroupSubscriberLambda
+  PaginationEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: Rule to listen for pagination events
+      EventPattern:
+        source:
+          - "com.observeinc.autosubscribe"
+        detail-type:
+          - "pagination"
+      State: "ENABLED"
+      Targets:
+        - Arn: !GetAtt LogGroupSubscriberLambda.Arn
+          Id: !Ref LogGroupSubscriberLambda
+  PermissionForNewLogGroupEventRuleToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LogGroupSubscriberLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt NewLogGroupEventRule.Arn
+  PermissionForPaginationEventRuleToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LogGroupSubscriberLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt PaginationEventRule.Arn
+  InitialLambdaTrigger:
+    Type: Custom::InitialLambdaTrigger
+    DependsOn:
+      - PermissionForNewLogGroupEventRuleToInvokeLambda
+      - PermissionForPaginationEventRuleToInvokeLambda
+    Properties:
+      Description: On stack creation, add subscriptions to all existing log groups that match the specified filters. On deletion, remove all subscriptions added by this template.
+      ServiceToken: !GetAtt LogGroupSubscriberLambda.Arn
