@@ -5,6 +5,8 @@ import logging
 import os
 import re
 import typing
+import time
+import threading
 
 import boto3
 
@@ -154,6 +156,53 @@ def modify_subscriptions(client, is_create: str, matches: list, exclusions: list
     return next_log_group, True
 
 
+def process_setup_event(logsClient, eventsClient, cfnEvent, start_log_group, matches, exclusions, args, context):
+    try:
+        logger.info(
+            'assuming event is a CloudFormation create or delete event')
+        if cfnEvent['RequestType'] == 'Create':
+            next_log_group, ok = modify_subscriptions(
+                logsClient, True, matches, exclusions, start_log_group, args)
+        elif cfnEvent['RequestType'] == 'Delete':
+            next_log_group, ok = modify_subscriptions(
+                logsClient, False, matches, exclusions, start_log_group, args)
+
+        if ok:
+            if next_log_group is None:
+                cfnresponse.send(cfnEvent, context,
+                                 cfnresponse.SUCCESS, {})
+            else:
+                logging.info(
+                    'sending pagination event: next_log_group=%s', next_log_group)
+                entry = {
+                    'Time': datetime.datetime.now(),
+                    'Source': EVENTBRIDGE_SOURCE,
+                    'DetailType': EVENTBRIDGE_DETAIL_TYPE,
+                    'Detail': json.dumps({
+                        'cfnEvent': cfnEvent,
+                        'next': next_log_group,
+                    }),
+                }
+                eventsClient.put_events(Entries=[entry])
+        else:
+            data = {
+                'Data': 'Error: unable to create subscriptions for any log groups',
+            }
+            cfnresponse.send(cfnEvent, context, cfnresponse.FAILED, data)
+    except Exception as e:
+        logger.error('unexpected exception: %s', e)
+        cfnresponse.send(cfnEvent, context, cfnresponse.FAILED, {
+            'Data': str(e)})
+
+
+def send_cfnresponse_5s_before_timeout(timeout_seconds: str, cfnEvent, context):
+    time.sleep(int(timeout_seconds) - 5)
+    data = {
+        'Data': 'Error: Lambda Function probably would have timed out. If the subscription process was close to completing, consider increasing the timeout.',
+    }
+    cfnresponse.send(cfnEvent, context, cfnresponse.FAILED, data)
+
+
 def main(event, context):
     matchStr = os.environ['LOG_GROUP_MATCHES']
     exclusionStr = os.environ['LOG_GROUP_EXCLUDES']
@@ -161,6 +210,7 @@ def main(event, context):
     filter_pattern = os.environ['FILTER_PATTERN']
     destination_rn = os.environ['DESTINATION_ARN']
     delivery_role = os.environ['DELIVERY_STREAM_ROLE_ARN']
+    timeout = os.environ['TIMEOUT']
 
     matches = matchStr.split(',') if matchStr != "" else []
     exclusions = exclusionStr.split(',') if exclusionStr != "" else []
@@ -184,40 +234,33 @@ def main(event, context):
             start_log_group = event['detail']['next']
 
         try:
-            logger.info(
-                'assuming event is a CloudFormation create or delete event')
-            if cfnEvent['RequestType'] == 'Create':
-                next_log_group, ok = modify_subscriptions(
-                    logsClient, True, matches, exclusions, start_log_group, args)
-            elif cfnEvent['RequestType'] == 'Delete':
-                next_log_group, ok = modify_subscriptions(
-                    logsClient, False, matches, exclusions, start_log_group, args)
-
-            if ok:
-                if next_log_group is None:
-                    cfnresponse.send(cfnEvent, context,
-                                     cfnresponse.SUCCESS, {})
-                else:
-                    logging.info(
-                        'sending pagination event: next_log_group=%s', next_log_group)
-                    entry = {
-                        'Time': datetime.datetime.now(),
-                        'Source': EVENTBRIDGE_SOURCE,
-                        'DetailType': EVENTBRIDGE_DETAIL_TYPE,
-                        'Detail': json.dumps({
-                            'cfnEvent': cfnEvent,
-                            'next': next_log_group,
-                        }),
-                    }
-                    eventsClient.put_events(Entries=[entry])
-            else:
-                data = {
-                    'Data': 'Error: unable to create subscriptions for any log groups',
-                }
-                cfnresponse.send(cfnEvent, context, cfnresponse.FAILED, data)
+            # This code exists so that lambda failures don't fail silently and indefinitely block
+            # the CloudFormation stack creation progress. Instead, this code tries to make it so that users
+            # actually get feedback if something goes wrong, saving them ~30 minutes.
+            #
+            # If the main thread completes in time, the lambda exits once the main thread is done
+            # and a successful response is sent to CloudFormation.
+            # If the main thread doesn't complete in time, cancel_thread hopefully completes
+            # and sends a response to CloudFormation before the Lambda execution environment is killed.
+            #
+            # If the cancel thread completes, then it's likely that the CloudFormation stack that
+            # calls this code will trigger a rollback. Deletion is likely to time out as well since
+            # the same code path is executed, resulting in an incomplete cleanup. Incomplete cleanup
+            # is fine, since the lambda code knows how to deal with it. A user just needs to rerun the
+            # CloudFormation stack or Terraform module with a larger timeout.
+            #
+            # There is a chance of a race condition where we send 2 responses to CloudFormation. This
+            # case is unlikely. It also doesn't result in incomplete setup for the customer.
+            main_thread = threading.Thread(target=process_setup_event, args=(
+                logsClient, eventsClient, cfnEvent, start_log_group, matches, exclusions, args, context))
+            cancel_thread = threading.Thread(
+                target=send_cfnresponse_5s_before_timeout, args=(timeout, cfnEvent, context))
+            main_thread.start()
+            cancel_thread.start()
+            main_thread.join()
         except Exception as e:
             logger.error('unexpected exception: %s', e)
-            cfnresponse.send(event, context, cfnresponse.FAILED, {
+            cfnresponse.send(cfnEvent, context, cfnresponse.FAILED, {
                 'Data': str(e)})
     elif is_new_log_group_event:
         logger.info('assuming event is an EventBridge event')

@@ -157,6 +157,7 @@ Resources:
               - Fn::ImportValue: !Sub "$${CollectionStackName}:logs:role:arn"
           FILTER_NAME: !Ref FilterName
           FILTER_PATTERN: !Ref FilterPattern
+          TIMEOUT: !Ref LambdaTimeout
       Runtime: python3.9
       Timeout: !Ref LambdaTimeout
       MemorySize: !Ref LambdaMemory
