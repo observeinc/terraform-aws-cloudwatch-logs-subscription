@@ -13,6 +13,7 @@ locals {
     "DELIVERY_STREAM_ROLE_ARN" = local.subscription_filter_role_arn
     "FILTER_NAME"              = var.filter_name
     "FILTER_PATTERN"           = var.filter_pattern
+    "TIMEOUT"                  = var.lambda_timeout
 
     # Bump VERSION if we want to re-create the subscription filters even
     # if the user's environment variables haven't changed.
