@@ -25,6 +25,7 @@ cloudformation:
 	terraform -chdir=./cloudformation init
 	terraform -chdir=./cloudformation apply -auto-approve
 	aws s3 cp cloudformation/generated/subscribelogs.yaml s3://observeinc/cloudformation/subscribelogs-`semtag final -s minor -o`.yaml
+	aws s3 cp cloudformation/generated/subscribelogs.yaml s3://observeinc/cloudformation/subscribelogs-latest.yaml
 
 .PHONY: release
 release: cloudformation
