@@ -7,9 +7,18 @@ All notable changes to this project will be documented in this file.
 
 
 
+<a name="v0.3.0"></a>
+## [v0.3.0] - 2022-10-24
+
+- chore: introduce -latest manifest
+- improvement: add test cases ([#9](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/9))
+- fix: send cloudformation response when lambda times out ([#8](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/8))
+
+
 <a name="v0.2.0"></a>
 ## [v0.2.0] - 2022-06-17
 
+- add changelog
 - reduce likelihood of hitting a lambda timeout ([#7](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/7))
 - avoid leftover log groups ([#5](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/5))
 - match all logs by default ([#4](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/4))
@@ -24,5 +33,6 @@ All notable changes to this project will be documented in this file.
 - Initial commit
 
 
-[Unreleased]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.3.0...HEAD
+[v0.3.0]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.2.0...v0.3.0
 [v0.2.0]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.1.0...v0.2.0
