@@ -1,3 +1,5 @@
+S3_CP_ARGS=aws s3 cp --acl public-read
+
 .PHONY: precommit-dependencies
 precommit-dependencies:
 	# github actions helper
@@ -24,8 +26,8 @@ changelog:
 cloudformation:
 	terraform -chdir=./cloudformation init
 	terraform -chdir=./cloudformation apply -auto-approve
-	aws s3 cp cloudformation/generated/subscribelogs.yaml s3://observeinc/cloudformation/subscribelogs-`semtag final -s minor -o`.yaml
-	aws s3 cp cloudformation/generated/subscribelogs.yaml s3://observeinc/cloudformation/subscribelogs-latest.yaml
+	$(S3_CP_ARGS) cloudformation/generated/subscribelogs.yaml s3://observeinc/cloudformation/subscribelogs-`semtag final -s minor -o`.yaml
+	$(S3_CP_ARGS) cloudformation/generated/subscribelogs.yaml s3://observeinc/cloudformation/subscribelogs-latest.yaml
 
 .PHONY: release
 release: cloudformation
