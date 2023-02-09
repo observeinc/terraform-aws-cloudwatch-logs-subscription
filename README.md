@@ -1,8 +1,6 @@
 # AWS CloudWatch Log Subscriptions Terraform module
 
-Terraform module that sets up CloudWatch Log Group Subscription Filters. This
-makes is easier to forward log data towards Observe
-(through the Observe Kinesis Firehose module).
+Terraform module that sets up CloudWatch Log Group Subscription Filters. This makes it easier to forward log data to Observe, through the Observe Kinesis Firehose module.
 
 By default, the module will create subscription filters for all log groups.
 
