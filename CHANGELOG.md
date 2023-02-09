@@ -7,9 +7,18 @@ All notable changes to this project will be documented in this file.
 
 
 
+<a name="v0.3.1"></a>
+## [v0.3.1] - 2023-01-20
+
+This version contains no changes to the module itself, and is intended to trigger an update of the module description in the Terraform Registry.
+
+- make: copy CloudFormation template to S3 as public ([#10](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/10))
+
+
 <a name="v0.3.0"></a>
 ## [v0.3.0] - 2022-10-24
 
+- chore: update changelog
 - chore: introduce -latest manifest
 - improvement: add test cases ([#9](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/9))
 - fix: send cloudformation response when lambda times out ([#8](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/8))
@@ -33,6 +42,7 @@ All notable changes to this project will be documented in this file.
 - Initial commit
 
 
-[Unreleased]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.4.0...HEAD
+[v0.4.0]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.3.0...v0.4.0
 [v0.3.0]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.2.0...v0.3.0
 [v0.2.0]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.1.0...v0.2.0
