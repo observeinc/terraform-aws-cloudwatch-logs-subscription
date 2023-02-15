@@ -15,6 +15,7 @@ locals {
     "FILTER_NAME"              = var.filter_name
     "FILTER_PATTERN"           = var.filter_pattern
     "TIMEOUT"                  = var.lambda_timeout
+    "IGNORE_DELETE_ERRORS"     = var.ignore_delete_errors
 
     # Bump VERSION if we want to re-create the subscription filters even
     # if the user's environment variables haven't changed.
