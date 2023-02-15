@@ -22,6 +22,11 @@ variable "log_group_matches" {
   EOF
   type        = list(string)
   default     = [".*"]
+
+  validation {
+    condition     = can([for x in var.log_group_matches : regexall(x, "")])
+    error_message = "Variable log_group_matches contains invalid regex."
+  }
 }
 
 variable "log_group_excludes" {
@@ -32,6 +37,11 @@ variable "log_group_excludes" {
 
   type    = list(string)
   default = []
+
+  validation {
+    condition     = can([for x in var.log_group_excludes : regexall(x, "")])
+    error_message = "Variable log_group_excludes contains invalid regex."
+  }
 }
 
 variable "filter_pattern" {
