@@ -1,3 +1,4 @@
+# Note: Please try to ensure that any new AWS resource block has tags = var.tags, if the tags field exists.
 locals {
   partition = data.aws_partition.current.partition
   account   = data.aws_caller_identity.current.account_id
@@ -46,6 +47,8 @@ resource "aws_iam_role" "subscription_filter" {
       ]
     }
   EOF
+
+  tags = var.tags
 }
 
 resource "aws_iam_role_policy_attachment" "subscription_filter" {
@@ -56,6 +59,8 @@ resource "aws_iam_role_policy_attachment" "subscription_filter" {
 resource "aws_cloudwatch_log_group" "lambda" {
   name              = "/aws/lambda/${local.function_name}"
   retention_in_days = var.log_group_expiration_in_days
+
+  tags = var.tags
 }
 
 resource "aws_iam_role" "lambda" {
@@ -75,6 +80,8 @@ resource "aws_iam_role" "lambda" {
       ]
     }
   EOF
+
+  tags = var.tags
 }
 
 resource "aws_iam_policy" "lambda" {
@@ -122,6 +129,8 @@ resource "aws_iam_policy" "lambda" {
       ]
     }
   EOF
+
+  tags = var.tags
 }
 
 resource "aws_iam_role_policy_attachment" "lambda" {
@@ -155,6 +164,8 @@ resource "aws_lambda_function" "lambda" {
   filename         = data.archive_file.lambda_code.output_path
   source_code_hash = data.archive_file.lambda_code.output_base64sha256
 
+  tags = var.tags
+
   depends_on = [
     aws_iam_role_policy_attachment.subscription_filter,
     aws_iam_role_policy_attachment.lambda,
@@ -175,6 +186,8 @@ resource "aws_cloudwatch_event_rule" "new_log_groups" {
       }
     }
   EOF
+
+  tags = var.tags
 }
 
 resource "aws_cloudwatch_event_rule" "pagination" {
@@ -186,6 +199,8 @@ resource "aws_cloudwatch_event_rule" "pagination" {
       "detail-type": ["pagination"]
     }
   EOF
+
+  tags = var.tags
 }
 
 resource "aws_lambda_permission" "event_rules" {
@@ -235,5 +250,6 @@ resource "aws_cloudformation_stack" "lambda_trigger" {
           ServiceToken: !Ref LambdaArn
   EOF
 
+  tags       = var.tags
   depends_on = [aws_cloudwatch_event_target.event_rules]
 }
