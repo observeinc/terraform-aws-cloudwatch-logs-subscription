@@ -93,3 +93,9 @@ variable "lambda_memory" {
   type        = number
   default     = 128
 }
+
+variable "tags" {
+  description = "A map of tags to add to all resources"
+  type        = map(string)
+  default     = {}
+}
