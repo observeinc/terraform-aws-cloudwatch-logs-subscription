@@ -7,9 +7,22 @@ All notable changes to this project will be documented in this file.
 
 
 
+<a name="v0.5.0"></a>
+## [v0.5.0] - 0001-01-01
+
+
+
+<a name="v0.4.0"></a>
+## [v0.4.0] - 2023-02-16
+
+- fix: validate regex for log_group_matches and log_group_excludes ([#13](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/13))
+- feat: add tags variable ([#11](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/11))
+
+
 <a name="v0.3.2"></a>
 ## [v0.3.2] - 2023-02-08
 
+- chore: update changelog
 - docs(description): fix typos, shorten
 
 
@@ -47,8 +60,10 @@ All notable changes to this project will be documented in this file.
 - Initial commit
 
 
-[Unreleased]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.4.0...HEAD
-[v0.4.0]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.3.1...v0.4.0
+[Unreleased]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.5.0...HEAD
+[v0.5.0]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.4.0...v0.5.0
+[v0.4.0]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.3.2...v0.4.0
+[v0.3.2]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.3.1...v0.3.2
 [v0.3.1]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.3.0...v0.3.1
 [v0.3.0]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.2.0...v0.3.0
 [v0.2.0]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.1.0...v0.2.0
