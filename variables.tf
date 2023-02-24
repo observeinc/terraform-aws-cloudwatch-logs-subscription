@@ -3,6 +3,7 @@
 variable "name" {
   type        = string
   default     = "observe-logs-subscription"
+  nullable    = false
   description = "Module name. Used to determine the name of some resources"
 }
 
@@ -62,6 +63,7 @@ variable "iam_name_prefix" {
   description = "Prefix used for all created IAM roles and policies"
   type        = string
   default     = "observe-logs-subscription"
+  nullable    = false
 }
 
 variable "iam_role_arn" {

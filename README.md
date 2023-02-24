@@ -4,10 +4,6 @@ Terraform module that sets up CloudWatch Log Group Subscription Filters. This ma
 
 By default, the module will create subscription filters for all log groups.
 
-## Terraform versions
-
-Terraform 0.13 and newer. Submit pull-requests to `main` branch.
-
 ## Usage
 
 ```hcl
@@ -48,7 +44,7 @@ If no role ARN is provided, a new role will be created.
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 0.13.0 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.1 |
 | <a name="requirement_archive"></a> [archive](#requirement\_archive) | >= 2.2 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 2.68 |
 
