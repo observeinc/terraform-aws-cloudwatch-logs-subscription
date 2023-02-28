@@ -8,8 +8,10 @@ All notable changes to this project will be documented in this file.
 
 
 <a name="v0.5.0"></a>
-## [v0.5.0] - 0001-01-01
+## [v0.5.0] - 2023-02-27
 
+- fix!: make name non-nullable ([#16](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/16))
+- chore: update changelog
 
 
 <a name="v0.4.0"></a>
