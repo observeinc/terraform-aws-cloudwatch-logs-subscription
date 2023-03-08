@@ -9,6 +9,8 @@ precommit-dependencies:
 
 .PHONY: test
 test:
+	terraform -chdir=./cloudformation init
+	terraform -chdir=./cloudformation apply -auto-approve
 	pre-commit run
 	python3 ./lambda/test_index.py
 
