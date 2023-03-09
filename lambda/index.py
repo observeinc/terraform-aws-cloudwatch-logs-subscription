@@ -26,6 +26,10 @@ EVENTBRIDGE_DETAIL_TYPE = "pagination"
 # of main() will create or delete. This allows users to avoid hitting lambda timeouts.
 MAX_SUBSCRIPTIONS_PER_INVOCATION = 100
 
+# If our code generates an exception on rollback (delete), the user will need to go to the UI
+# to manually delete the CloudFormation Stack. IGNORE_DELETE_ERRORS allows the user to
+# delete the stack without going to the UI.
+ignore_delete_errors = os.environ['IGNORE_DELETE_ERRORS']
 
 @dataclasses.dataclass
 class SubscriptionArgs:
@@ -67,6 +71,8 @@ class AWSWrapper:
         return self.events_client.put_events(**kwargs)
 
     def send_cfnresponse(self, event, responseStatus, responseData, physicalResourceId=None, noEcho=False, reason=None):
+        if ignore_delete_errors and event['RequestType'] == 'Delete':
+            responseStatus = cfnresponse.SUCCESS
         return cfnresponse.send(event, self.context, responseStatus, responseData, physicalResourceId=physicalResourceId, noEcho=noEcho, reason=reason)
 
 
@@ -191,7 +197,6 @@ def modify_subscriptions(client_wrapper: AWSWrapper, is_create: str, matches: li
         return None, False
     return next_log_group, True
 
-
 def process_setup_event(client_wrapper: AWSWrapper, cfn_event, start_log_group: typing.Optional[str], matches: typing.List[str], exclusions: typing.List[str], args: SubscriptionArgs):
     try:
         logger.info(
@@ -230,15 +235,15 @@ def process_setup_event(client_wrapper: AWSWrapper, cfn_event, start_log_group: 
         logger.error('unexpected exception: %s', e)
         traceback.print_exc()
         client_wrapper.send_cfnresponse(cfn_event, cfnresponse.FAILED, {
-            'Data': str(e)})
+            'Error': str(e)})
 
 
-def send_cfnresponse_5s_before_timeout(client_wrapper: AWSWrapper, timeout_seconds: int, cfnEvent):
+def send_cfnresponse_5s_before_timeout(client_wrapper: AWSWrapper, timeout_seconds: int, cfn_event):
     time.sleep(timeout_seconds - 5)
     data = {
         'Data': 'Error: Lambda Function probably would have timed out. If the subscription process was close to completing, consider increasing the timeout.',
     }
-    client_wrapper.send_cfnresponse(cfnEvent, cfnresponse.FAILED, data)
+    client_wrapper.send_cfnresponse(cfn_event, cfnresponse.FAILED, data)
 
 
 def rest_of_main(event, client_wrapper: AWSWrapper, matches: typing.List[str], exclusions: typing.List[str], args: SubscriptionArgs, timeout: int):
@@ -255,24 +260,26 @@ def rest_of_main(event, client_wrapper: AWSWrapper, matches: typing.List[str], e
             cfn_event = event['detail']['cfnEvent']
             start_log_group = event['detail']['next']
 
+        # This code exists so that lambda failures don't fail silently and indefinitely block
+        # the CloudFormation stack creation progress. Instead, this code tries to make it so that users
+        # actually get feedback if something goes wrong, saving them ~30 minutes.
+        #
+        # If the main thread completes in time, the lambda exits once the main thread is done
+        # and a successful response is sent to CloudFormation.
+        # If the main thread doesn't complete in time, cancel_thread hopefully completes
+        # and sends a response to CloudFormation before the Lambda execution environment is killed.
+        #
+        # If the cancel thread completes, then it's likely that the CloudFormation stack that
+        # calls this code will trigger a rollback. Deletion is likely to time out as well since
+        # the same code path is executed, resulting in an incomplete cleanup. Incomplete cleanup
+        # is fine, since the lambda code knows how to deal with it. A user just needs to rerun the
+        # CloudFormation stack or Terraform module with a larger timeout.
+        #
+        # If some exception occurs, then we send a cfnresponse so that the CloudFormation stack does not hang.
+        #
+        # There is a chance of a race condition where we send 2 responses to CloudFormation. This
+        # case is unlikely. It also doesn't result in incomplete setup for the customer.
         try:
-            # This code exists so that lambda failures don't fail silently and indefinitely block
-            # the CloudFormation stack creation progress. Instead, this code tries to make it so that users
-            # actually get feedback if something goes wrong, saving them ~30 minutes.
-            #
-            # If the main thread completes in time, the lambda exits once the main thread is done
-            # and a successful response is sent to CloudFormation.
-            # If the main thread doesn't complete in time, cancel_thread hopefully completes
-            # and sends a response to CloudFormation before the Lambda execution environment is killed.
-            #
-            # If the cancel thread completes, then it's likely that the CloudFormation stack that
-            # calls this code will trigger a rollback. Deletion is likely to time out as well since
-            # the same code path is executed, resulting in an incomplete cleanup. Incomplete cleanup
-            # is fine, since the lambda code knows how to deal with it. A user just needs to rerun the
-            # CloudFormation stack or Terraform module with a larger timeout.
-            #
-            # There is a chance of a race condition where we send 2 responses to CloudFormation. This
-            # case is unlikely. It also doesn't result in incomplete setup for the customer.
             main_thread = threading.Thread(target=process_setup_event, args=(
                 client_wrapper, cfn_event, start_log_group, matches, exclusions, args))
             cancel_thread = threading.Thread(
@@ -282,8 +289,9 @@ def rest_of_main(event, client_wrapper: AWSWrapper, matches: typing.List[str], e
             main_thread.join()
         except Exception as e:
             logger.error('unexpected exception: %s', e)
+            traceback.print_exc()
             client_wrapper.send_cfnresponse(cfn_event, cfnresponse.FAILED, {
-                'Data': str(e)})
+                'Error': str(e)})
     elif is_new_log_group_event:
         logger.info('assuming event is an CreateLogGroup Eventbridge event')
         if 'errorCode' in event['detail']:

@@ -106,6 +106,14 @@ variable "lambda_memory" {
   default     = 128
 }
 
+variable "ignore_delete_errors" {
+  description = <<-EOF
+    If an error occurs while deleting subscription filters, ignore it, leaving behind any remaining filters.
+  EOF
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "A map of tags to add to all resources"
   type        = map(string)
