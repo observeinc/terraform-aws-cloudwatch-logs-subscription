@@ -51,6 +51,11 @@ module "cloudwatch_kinesis_firehose_cfn" {
   observe_token    = "fake:token"
 }
 
+resource "aws_iam_role_policy_attachment" "subscription_filter" {
+  role       = aws_iam_role.subscription_filter.name
+  policy_arn = module.cloudwatch_kinesis_firehose_cfn.firehose_iam_policy.arn
+}
+
 resource "aws_cloudformation_stack" "this" {
   name = "test-subscription-cfn-${random_id.this.hex}"
 
@@ -67,4 +72,5 @@ resource "aws_cloudformation_stack" "this" {
     "DestinationArnOverride"        = module.cloudwatch_kinesis_firehose_cfn.firehose_delivery_stream.arn
     "DeliveryStreamRoleArnOverride" = aws_iam_role.subscription_filter.arn
   }
+  disable_rollback = true
 }
