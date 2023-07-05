@@ -47,7 +47,7 @@ variable "log_group_excludes" {
 
 variable "filter_pattern" {
   description = <<-EOF
-    The filter pattern to use. For more information, see [Filter and Pattern Syntax](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html)"
+    The filter pattern that selects the log events that will be sent to Observe for each CloudWatch Logs group. To send all events, leave this empty (""). For more information, see [Filter and Pattern Syntax](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html).
   EOF
   type        = string
   default     = ""
