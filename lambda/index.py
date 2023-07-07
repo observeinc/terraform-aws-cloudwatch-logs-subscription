@@ -23,13 +23,15 @@ EVENTBRIDGE_SOURCE = "com.observeinc.autosubscribe"
 EVENTBRIDGE_DETAIL_TYPE = "pagination"
 
 # MAX_SUBSCRIPTIONS_PER_INVOCATION is the maximum number of subscriptions an invocation
-# of main() will create or delete. This allows users to avoid hitting lambda timeouts.
+# of main() will create or delete. This allows users to avoid hitting
+# lambda timeouts.
 MAX_SUBSCRIPTIONS_PER_INVOCATION = 100
 
 # If our code generates an exception on rollback (delete), the user will need to go to the UI
 # to manually delete the CloudFormation Stack. IGNORE_DELETE_ERRORS allows the user to
 # delete the stack without going to the UI.
 ignore_delete_errors = os.environ['IGNORE_DELETE_ERRORS']
+
 
 @dataclasses.dataclass
 class SubscriptionArgs:
@@ -70,13 +72,31 @@ class AWSWrapper:
     def put_events(self, **kwargs):
         return self.events_client.put_events(**kwargs)
 
-    def send_cfnresponse(self, event, responseStatus, responseData, physicalResourceId=None, noEcho=False, reason=None):
+    def send_cfnresponse(
+            self,
+            event,
+            responseStatus,
+            responseData,
+            physicalResourceId=None,
+            noEcho=False,
+            reason=None):
         if ignore_delete_errors and event['RequestType'] == 'Delete':
             responseStatus = cfnresponse.SUCCESS
-        return cfnresponse.send(event, self.context, responseStatus, responseData, physicalResourceId=physicalResourceId, noEcho=noEcho, reason=reason)
+        return cfnresponse.send(
+            event,
+            self.context,
+            responseStatus,
+            responseData,
+            physicalResourceId=physicalResourceId,
+            noEcho=noEcho,
+            reason=reason)
 
 
-def modify_subscription(client_wrapper: AWSWrapper, is_create: bool, log_group_name: str, subscription_args: SubscriptionArgs) -> bool:
+def modify_subscription(
+        client_wrapper: AWSWrapper,
+        is_create: bool,
+        log_group_name: str,
+        subscription_args: SubscriptionArgs) -> bool:
     """modify_subscription creates or deletes a subscription filter for the log group specified by log_group_name
 
     if is_create is True, modify_subscription returns True if a subscription filter with the specified subscription_args exists (was created or already existed).
@@ -100,38 +120,49 @@ def modify_subscription(client_wrapper: AWSWrapper, is_create: bool, log_group_n
 
     if is_create and (not filter_exists):
         try:
-            client_wrapper.put_subscription_filter(logGroupName=log_group_name,
-                                                   destinationArn=subscription_args.destination_arn,
-                                                   filterName=subscription_args.filter_name,
-                                                   filterPattern=subscription_args.filter_pattern,
-                                                   roleArn=subscription_args.role_arn)
+            client_wrapper.put_subscription_filter(
+                logGroupName=log_group_name,
+                destinationArn=subscription_args.destination_arn,
+                filterName=subscription_args.filter_name,
+                filterPattern=subscription_args.filter_pattern,
+                roleArn=subscription_args.role_arn)
             logger.info('created subscription filter %s for log group %s',
                         subscription_args.filter_name, log_group_name)
         except Exception as err:
             logger.error(
-                'error adding subscription to log group %s: %s', log_group_name, err)
+                'error adding subscription to log group %s: %s',
+                log_group_name,
+                err)
             return False
 
     if (not is_create) and filter_exists:
         try:
-            client_wrapper.delete_subscription_filter(logGroupName=log_group_name,
-                                                      filterName=subscription_args.filter_name)
+            client_wrapper.delete_subscription_filter(
+                logGroupName=log_group_name,
+                filterName=subscription_args.filter_name)
             logger.info('deleted subscription filter %s for log group %s',
                         subscription_args.filter_name, log_group_name)
         except Exception as err:
             logger.error(
-                'error removing subscription from log group %s: %s', log_group_name, err)
+                'error removing subscription from log group %s: %s',
+                log_group_name,
+                err)
             return False
     return True
 
 
-def should_subscribe(name: str, matches: typing.List[str], exclusions: typing.List[str]) -> bool:
+def should_subscribe(
+        name: str,
+        matches: typing.List[str],
+        exclusions: typing.List[str]) -> bool:
     """should_subscribe checks whether a log group with name 'name' should be subscribed to"""
     exclude = any([re.fullmatch(pattern, name)
                    for pattern in exclusions])
     if exclude:
         logging.info(
-            'log group %s matches an exclusion regex pattern %s', name, exclusions)
+            'log group %s matches an exclusion regex pattern %s',
+            name,
+            exclusions)
     else:
         match = any([re.fullmatch(pattern, name)
                     for pattern in matches])
@@ -143,7 +174,13 @@ def should_subscribe(name: str, matches: typing.List[str], exclusions: typing.Li
     return False
 
 
-def modify_subscriptions(client_wrapper: AWSWrapper, is_create: str, matches: list, exclusions: list, start_log_group: typing.Optional[str], subscription_args: SubscriptionArgs) -> typing.Tuple[typing.Optional[str], bool]:
+def modify_subscriptions(client_wrapper: AWSWrapper,
+                         is_create: str,
+                         matches: list,
+                         exclusions: list,
+                         start_log_group: typing.Optional[str],
+                         subscription_args: SubscriptionArgs) -> typing.Tuple[typing.Optional[str],
+                                                                              bool]:
     """modify_subscriptions creates or cleans up subscription filters for log groups that satisfy the
     lists of match and exclusion regex patterns. Exclusions have precedence over matches.
 
@@ -158,7 +195,8 @@ def modify_subscriptions(client_wrapper: AWSWrapper, is_create: str, matches: li
     logger.info('modify_subscriptions: %s %s %s %s',
                 is_create, matches, exclusions, subscription_args)
 
-    # There are at most a few thousand log groups, so it should be ok to load them all into memory.
+    # There are at most a few thousand log groups, so it should be ok to load
+    # them all into memory.
     log_groups = []
     paginator = client_wrapper.describe_log_groups_paginator()
     for page in paginator.paginate():
@@ -197,7 +235,14 @@ def modify_subscriptions(client_wrapper: AWSWrapper, is_create: str, matches: li
         return None, False
     return next_log_group, True
 
-def process_setup_event(client_wrapper: AWSWrapper, cfn_event, start_log_group: typing.Optional[str], matches: typing.List[str], exclusions: typing.List[str], args: SubscriptionArgs):
+
+def process_setup_event(
+        client_wrapper: AWSWrapper,
+        cfn_event,
+        start_log_group: typing.Optional[str],
+        matches: typing.List[str],
+        exclusions: typing.List[str],
+        args: SubscriptionArgs):
     try:
         logger.info(
             'assuming event is a CloudFormation create or delete event')
@@ -214,7 +259,8 @@ def process_setup_event(client_wrapper: AWSWrapper, cfn_event, start_log_group: 
                     cfn_event, cfnresponse.SUCCESS, {})
             else:
                 logging.info(
-                    'sending pagination event: next_log_group=%s', next_log_group)
+                    'sending pagination event: next_log_group=%s',
+                    next_log_group)
                 entry = {
                     'Time': datetime.datetime.now(),
                     'Source': EVENTBRIDGE_SOURCE,
@@ -227,8 +273,7 @@ def process_setup_event(client_wrapper: AWSWrapper, cfn_event, start_log_group: 
                 client_wrapper.put_events(Entries=[entry])
         else:
             data = {
-                'Data': 'Error: unable to create subscriptions for any log groups',
-            }
+                'Data': 'Error: unable to create subscriptions for any log groups', }
             client_wrapper.send_cfnresponse(
                 cfn_event, cfnresponse.FAILED, data)
     except Exception as e:
@@ -238,7 +283,10 @@ def process_setup_event(client_wrapper: AWSWrapper, cfn_event, start_log_group: 
             'Error': str(e)})
 
 
-def send_cfnresponse_5s_before_timeout(client_wrapper: AWSWrapper, timeout_seconds: int, cfn_event):
+def send_cfnresponse_5s_before_timeout(
+        client_wrapper: AWSWrapper,
+        timeout_seconds: int,
+        cfn_event):
     time.sleep(timeout_seconds - 5)
     data = {
         'Data': 'Error: Lambda Function probably would have timed out. If the subscription process was close to completing, consider increasing the timeout.',
@@ -246,7 +294,13 @@ def send_cfnresponse_5s_before_timeout(client_wrapper: AWSWrapper, timeout_secon
     client_wrapper.send_cfnresponse(cfn_event, cfnresponse.FAILED, data)
 
 
-def rest_of_main(event, client_wrapper: AWSWrapper, matches: typing.List[str], exclusions: typing.List[str], args: SubscriptionArgs, timeout: int):
+def rest_of_main(
+        event,
+        client_wrapper: AWSWrapper,
+        matches: typing.List[str],
+        exclusions: typing.List[str],
+        args: SubscriptionArgs,
+        timeout: int):
     """rest_of_main is supposed to be testable. It should not call client_wrapper"""
 
     is_cfn_event = 'ResponseURL' in event
@@ -278,12 +332,21 @@ def rest_of_main(event, client_wrapper: AWSWrapper, matches: typing.List[str], e
         # If some exception occurs, then we send a cfnresponse so that the CloudFormation stack does not hang.
         #
         # There is a chance of a race condition where we send 2 responses to CloudFormation. This
-        # case is unlikely. It also doesn't result in incomplete setup for the customer.
+        # case is unlikely. It also doesn't result in incomplete setup for the
+        # customer.
         try:
-            main_thread = threading.Thread(target=process_setup_event, args=(
-                client_wrapper, cfn_event, start_log_group, matches, exclusions, args))
+            main_thread = threading.Thread(
+                target=process_setup_event,
+                args=(
+                    client_wrapper,
+                    cfn_event,
+                    start_log_group,
+                    matches,
+                    exclusions,
+                    args))
             cancel_thread = threading.Thread(
-                target=send_cfnresponse_5s_before_timeout, args=(client_wrapper, timeout, cfn_event))
+                target=send_cfnresponse_5s_before_timeout, args=(
+                    client_wrapper, timeout, cfn_event))
             main_thread.start()
             cancel_thread.start()
             main_thread.join()
