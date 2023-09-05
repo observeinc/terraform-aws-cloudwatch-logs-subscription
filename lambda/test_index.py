@@ -5,7 +5,8 @@ import unittest
 
 from index import EVENTBRIDGE_SOURCE, MAX_SUBSCRIPTIONS_PER_INVOCATION, rest_of_main, SubscriptionArgs
 
-# From https://docs.aws.amazon.com/lambda/latest/dg/services-cloudformation.html
+# From
+# https://docs.aws.amazon.com/lambda/latest/dg/services-cloudformation.html
 FAKE_CFN_CREATE_EVENT = {
     "RequestType": "Create",
     "ServiceToken": "arn:aws:lambda:us-east-2:123456789012:function:lambda-error-processor-primer-14ROR2T3JKU66",
@@ -46,7 +47,10 @@ FAKE_CONTEXT = FakeContext("fake-log-stream-name")
 class FakeWrapper:
     """FakeWrapper is a AWSWrapper mock."""
 
-    def __init__(self, log_groups: typing.List[str], subscription_filters: typing.Dict[str, typing.List[SubscriptionArgs]]) -> None:
+    def __init__(self,
+                 log_groups: typing.List[str],
+                 subscription_filters: typing.Dict[str,
+                                                   typing.List[SubscriptionArgs]]) -> None:
         self.log_groups = log_groups
         self.subscription_filters = subscription_filters
         self.record = []
@@ -61,7 +65,8 @@ class FakeWrapper:
                 self.log_groups = log_groups
 
             def paginate(self):
-                return [{"logGroups": [{"logGroupName": name} for name in self.log_groups]}]
+                return [{"logGroups": [{"logGroupName": name}
+                                       for name in self.log_groups]}]
         return FakePaginator(self.log_groups)
 
     def describe_subscription_filters(self, **kwargs):
@@ -87,7 +92,10 @@ class FakeWrapper:
             kwargs
         ])
         args = SubscriptionArgs(
-            kwargs['destinationArn'], kwargs['filterName'], kwargs['filterPattern'], kwargs['roleArn'])
+            kwargs['destinationArn'],
+            kwargs['filterName'],
+            kwargs['filterPattern'],
+            kwargs['roleArn'])
         if kwargs['logGroupName'] in self.subscription_filters:
             self.subscription_filters[kwargs['logGroupName']].append(args)
         else:
@@ -110,11 +118,22 @@ class FakeWrapper:
             kwargs
         ])
 
-    def send_cfnresponse(self, event, responseStatus, responseData, physicalResourceId=None, noEcho=False, reason=None):
-        self.record.append([
-            "send_cfnresponse",
-            event, responseStatus, responseData, physicalResourceId, noEcho, reason,
-        ])
+    def send_cfnresponse(
+            self,
+            event,
+            responseStatus,
+            responseData,
+            physicalResourceId=None,
+            noEcho=False,
+            reason=None):
+        self.record.append(["send_cfnresponse",
+                            event,
+                            responseStatus,
+                            responseData,
+                            physicalResourceId,
+                            noEcho,
+                            reason,
+                            ])
 
 
 class TestRestOfMain(unittest.TestCase):
@@ -148,9 +167,25 @@ class TestRestOfMain(unittest.TestCase):
         rest_of_main(FAKE_CFN_CREATE_EVENT,
                      wrapper, matches, exclusions, args, timeout)
 
-        expected = {'/aws/bean/nginx1': [SubscriptionArgs(destination_arn='fake-destination-arn', filter_name='my-filter', filter_pattern='', role_arn='fake-role-arn')],
-                    '/aws/lambda/func1': [SubscriptionArgs(destination_arn='fake-destination-arn', filter_name='my-filter', filter_pattern='', role_arn='fake-role-arn')],
-                    '/aws/lambda/func2': [SubscriptionArgs(destination_arn='fake-destination-arn', filter_name='my-filter', filter_pattern='', role_arn='fake-role-arn')]}
+        expected = {
+            '/aws/bean/nginx1': [
+                SubscriptionArgs(
+                    destination_arn='fake-destination-arn',
+                    filter_name='my-filter',
+                    filter_pattern='',
+                    role_arn='fake-role-arn')],
+            '/aws/lambda/func1': [
+                SubscriptionArgs(
+                    destination_arn='fake-destination-arn',
+                    filter_name='my-filter',
+                    filter_pattern='',
+                    role_arn='fake-role-arn')],
+            '/aws/lambda/func2': [
+                SubscriptionArgs(
+                    destination_arn='fake-destination-arn',
+                    filter_name='my-filter',
+                    filter_pattern='',
+                    role_arn='fake-role-arn')]}
         self.assertEqual(wrapper.subscription_filters, expected)
 
         rest_of_main(FAKE_CFN_DELETE_EVENT,
@@ -184,8 +219,13 @@ class TestRestOfMain(unittest.TestCase):
 
         rest_of_main(create_log_group_event,
                      wrapper, matches, exclusions, args, timeout)
-        expected = {'/aws/bean/nginx1': [SubscriptionArgs(
-            destination_arn='fake-destination-arn', filter_name='my-filter', filter_pattern='', role_arn='fake-role-arn')]}
+        expected = {
+            '/aws/bean/nginx1': [
+                SubscriptionArgs(
+                    destination_arn='fake-destination-arn',
+                    filter_name='my-filter',
+                    filter_pattern='',
+                    role_arn='fake-role-arn')]}
         self.assertEqual(wrapper.subscription_filters, expected)
 
     def test_new_log_group_bad_event(self):
@@ -245,23 +285,32 @@ class TestRestOfMain(unittest.TestCase):
                                     "my-filter", "", "fake-role-arn")
             timeout = 10
 
-            rest_of_main(FAKE_CFN_CREATE_EVENT,
-                         wrapper, case["matches"], case["exclusions"], args, timeout)
+            rest_of_main(
+                FAKE_CFN_CREATE_EVENT,
+                wrapper,
+                case["matches"],
+                case["exclusions"],
+                args,
+                timeout)
             actual = {r[1]["logGroupName"]
                       for r in wrapper.record
                       if r[0] == "put_subscription_filter"}
             self.assertEqual(case["expected"], actual)
 
     def test_subscription_args(self):
-        tcs = [{
-            "args": SubscriptionArgs('fake-destination-arn', 'my-filter', 'my-filter-pattern', 'fake-role-arn'),
-            "expected": {
-                'destinationArn': 'fake-destination-arn',
-                'filterName': 'my-filter',
-                'filterPattern': 'my-filter-pattern',
-                'roleArn': 'fake-role-arn'
-            },
-        }]
+        tcs = [
+            {
+                "args": SubscriptionArgs(
+                    'fake-destination-arn',
+                    'my-filter',
+                    'my-filter-pattern',
+                    'fake-role-arn'),
+                "expected": {
+                    'destinationArn': 'fake-destination-arn',
+                    'filterName': 'my-filter',
+                    'filterPattern': 'my-filter-pattern',
+                    'roleArn': 'fake-role-arn'},
+            }]
         for case in tcs:
             wrapper = FakeWrapper(log_groups=[
                 "/aws/lambda/func1",
@@ -392,9 +441,25 @@ class TestRestOfMain(unittest.TestCase):
         rest_of_main(FAKE_CFN_CREATE_EVENT,
                      wrapper, matches, exclusions, args, timeout)
 
-        expected = {'/aws/bean/nginx1': [SubscriptionArgs(destination_arn='fake-destination-arn', filter_name='my-filter', filter_pattern='', role_arn='fake-role-arn')],
-                    '/aws/lambda/func1': [SubscriptionArgs(destination_arn='fake-destination-arn', filter_name='my-filter', filter_pattern='', role_arn='fake-role-arn')],
-                    '/aws/lambda/func2': [SubscriptionArgs(destination_arn='fake-destination-arn', filter_name='my-filter', filter_pattern='', role_arn='fake-role-arn')]}
+        expected = {
+            '/aws/bean/nginx1': [
+                SubscriptionArgs(
+                    destination_arn='fake-destination-arn',
+                    filter_name='my-filter',
+                    filter_pattern='',
+                    role_arn='fake-role-arn')],
+            '/aws/lambda/func1': [
+                SubscriptionArgs(
+                    destination_arn='fake-destination-arn',
+                    filter_name='my-filter',
+                    filter_pattern='',
+                    role_arn='fake-role-arn')],
+            '/aws/lambda/func2': [
+                SubscriptionArgs(
+                    destination_arn='fake-destination-arn',
+                    filter_name='my-filter',
+                    filter_pattern='',
+                    role_arn='fake-role-arn')]}
         self.assertEqual(wrapper.subscription_filters, expected)
 
 
