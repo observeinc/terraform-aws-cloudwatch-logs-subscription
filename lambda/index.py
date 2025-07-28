@@ -30,7 +30,7 @@ MAX_SUBSCRIPTIONS_PER_INVOCATION = 100
 # If our code generates an exception on rollback (delete), the user will need to go to the UI
 # to manually delete the CloudFormation Stack. IGNORE_DELETE_ERRORS allows the user to
 # delete the stack without going to the UI.
-ignore_delete_errors = os.environ['IGNORE_DELETE_ERRORS']
+ignore_delete_errors = os.environ.get('IGNORE_DELETE_ERRORS', 'false').lower() == 'true'
 
 
 @dataclasses.dataclass
