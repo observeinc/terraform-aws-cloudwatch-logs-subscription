@@ -2,7 +2,7 @@
 locals {
   partition = data.aws_partition.current.partition
   account   = data.aws_caller_identity.current.account_id
-  region    = data.aws_region.current.name
+  region    = data.aws_region.current.id
 
   subscription_filter_role_arn = var.iam_role_arn != "" ? var.iam_role_arn : aws_iam_role.subscription_filter[0].arn
 
@@ -157,7 +157,7 @@ resource "aws_lambda_function" "lambda" {
     variables = local.function_env_vars
   }
 
-  runtime     = "python3.9"
+  runtime     = "python3.13"
   timeout     = var.lambda_timeout
   memory_size = var.lambda_memory
   handler     = "index.main"
