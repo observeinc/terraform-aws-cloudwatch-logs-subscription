@@ -19,7 +19,7 @@ module "observe_kinesis_firehose" {
 }
 
 module "observe_kinesis_firehose_cloudwatch_logs_subscription" {
-  source           = "https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription"
+  source           = "git::https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription"
   kinesis_firehose = module.observe_kinesis_firehose
 
   # Collect the log group defined above, all Elastic Beanstalk logs,
