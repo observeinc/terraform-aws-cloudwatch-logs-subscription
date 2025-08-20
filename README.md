@@ -12,14 +12,14 @@ resource "aws_cloudwatch_log_group" "group" {
 }
 
 module "observe_kinesis_firehose" {
-  source           = "github.com/observeinc/terraform-aws-kinesis-firehose"
+  source           = "observeinc/kinesis-firehose/aws"
   observe_customer = var.observe_customer
   observe_token    = var.observe_token
   name             = random_pet.run.id
 }
 
 module "observe_kinesis_firehose_cloudwatch_logs_subscription" {
-  source           = "git::https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription"
+  source           = "observeinc/cloudwatch-logs-subscription/aws"
   kinesis_firehose = module.observe_kinesis_firehose
 
   # Collect the log group defined above, all Elastic Beanstalk logs,
