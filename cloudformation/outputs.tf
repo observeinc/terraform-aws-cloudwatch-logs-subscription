@@ -1,0 +1,2 @@
+# Outputs for cloudformation module
+
