@@ -121,7 +121,7 @@ resource "aws_iam_policy" "lambda" {
         {
           "Effect": "Allow",
           "Action": [
-            "logs:DescribeLogGroup",
+            "logs:DescribeLogGroups",
             "logs:CreateLogStream",
             "logs:PutLogEvents"
           ],
