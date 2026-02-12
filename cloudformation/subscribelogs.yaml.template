@@ -127,7 +127,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - "logs:DescribeLogGroup"
+                  - "logs:DescribeLogGroups"
                   - "logs:CreateLogStream"
                   - "logs:PutLogEvents"
                 Resource: !Sub
