@@ -2,7 +2,7 @@
 locals {
   partition = data.aws_partition.current.partition
   account   = data.aws_caller_identity.current.account_id
-  region    = data.aws_region.current.id
+  region    = data.aws_region.current.name
 
   subscription_filter_role_arn = var.iam_role_arn != "" ? var.iam_role_arn : aws_iam_role.subscription_filter[0].arn
 
