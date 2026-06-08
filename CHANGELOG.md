@@ -7,9 +7,32 @@ All notable changes to this project will be documented in this file.
 
 
 
-<a name="v0.5.0"></a>
-## [v0.5.0] - 2023-02-27
+<a name="v0.6.1"></a>
+## [v0.6.1] - 2026-06-08
 
+- fix: replace deprecated `data.aws_region.current.id` with `data.aws_region.current.region` (AWS provider v6)
+- chore: bump minimum AWS provider version from `>= 2.68` to `>= 6.0`
+- chore: fix legacy provider constraint syntax in `versions.tf`
+- Update subscribelogs.yaml.template
+- Update main.tf
+
+
+<a name="v0.6.0"></a>
+## [v0.6.0] - 2025-07-29
+
+- chore: Update Python version to 3.13
+- chore(lint): did a quick run of autopep8 ([#19](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/19))
+- Create CODEOWNERS
+- docs: clarify `filter_pattern` usage ([#18](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/18))
+- chore: fix cloudformation test ([#17](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/17))
+- feat: ignore_delete_errors variable ([#12](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/12))
+- chore: fix make test target ([#14](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/14))
+
+
+<a name="v0.5.0"></a>
+## [v0.5.0] - 2023-02-28
+
+- chore: update changelog
 - fix!: make name non-nullable ([#16](https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/issues/16))
 - chore: update changelog
 
@@ -62,7 +85,9 @@ All notable changes to this project will be documented in this file.
 - Initial commit
 
 
-[Unreleased]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.6.1...HEAD
+[v0.6.1]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.6.0...v0.6.1
+[v0.6.0]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.5.0...v0.6.0
 [v0.5.0]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.4.0...v0.5.0
 [v0.4.0]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.3.2...v0.4.0
 [v0.3.2]: https://github.com/observeinc/terraform-aws-cloudwatch-logs-subscription/compare/v0.3.1...v0.3.2
